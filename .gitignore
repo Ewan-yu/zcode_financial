@@ -1,8 +1,28 @@
-# 知识库原始资料：只留本地，不上传（保留目录说明文件以维持结构）
+# ===== 仅本地，不上传远端（远端只保留源码、配置与模板）=====
+
+# 知识库：原始资料 + 提炼后的方法论（个人知识产权）
 knowledge/raw/*
 !knowledge/raw/README.md
+knowledge/distilled/*
+!knowledge/distilled/README.md
 
-# 可能含密钥的项目级 MCP 配置，不入库
+# 数据资产：日度快照与缓存
+data/snapshots/*
+!data/snapshots/README.md
+data/cache/*
+!data/cache/README.md
+
+# 个人投资记录：自选、持仓、预测台账、报告（敏感）
+portfolio/*
+!portfolio/README.md
+!portfolio/*.template.*
+predictions/*
+!predictions/README.md
+!predictions/*.template.*
+reports/*
+!reports/README.md
+
+# 可能含密钥的项目级 MCP 配置
 .zcode/config.json
 
 # Python
