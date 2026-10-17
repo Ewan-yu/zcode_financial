@@ -375,7 +375,7 @@ def youzi():
              "T+1平均冲高回落%": round(sum(retr) / len(retr), 2) if retr else None,
              "状态分布": "了结%d / 在池%d" % (
                  sum(1 for r in recs if r["status"] == "已了结"),
-                 sum(1 for r in recs if r["status"] == "在池中"), 0),
+                 sum(1 for r in recs if r["status"] == "在池中")),
              "操作盈亏均值%": round(sum(ops) / len(ops), 2) if ops else None}
     profile = None
     pp = ROOT / "data" / "youzi_profile.json"
