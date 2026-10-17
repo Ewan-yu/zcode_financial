@@ -1,0 +1,14 @@
+# 知识库原始资料：只留本地，不上传（保留目录说明文件以维持结构）
+knowledge/raw/*
+!knowledge/raw/README.md
+
+# 可能含密钥的项目级 MCP 配置，不入库
+.zcode/config.json
+
+# Python
+__pycache__/
+*.pyc
+
+# 系统杂物
+Thumbs.db
+.DS_Store
