@@ -13,7 +13,7 @@
 <div class="tbl" style="margin-bottom:10px"><h3>条目级胜率（依据方法论条目聚合——策略迭代的统计基础；样本小仅作跟踪，勿过早下结论）</h3>
 <table><thead><tr><th>条目</th><th>对</th><th>错</th><th>其他</th><th>待验证</th><th>胜率</th></tr></thead><tbody>
 {% for ref, v in by_refs %}
-<tr><td class="cold">{{ ref }}</td><td class="up">{{ v.对 }}</td><td class="down">{{ v.错 }}</td><td>{{ v.其他 }}</td><td class="warn">{{ v.待 }}</td>
+<tr><td class="cold">{{ ref }}{% if entries.get(ref) %}<br><span style="color:var(--text);font-size:12px">{{ entries[ref] }}</span>{% endif %}</td><td class="up">{{ v.对 }}</td><td class="down">{{ v.错 }}</td><td>{{ v.其他 }}</td><td class="warn">{{ v.待 }}</td>
     <td>{% set n = v.对 + v.错 %}{% if n %}{{ ((v.对 / n * 100) | round(1)) }}%{% else %}—{% endif %}</td></tr>
 {% endfor %}
 </tbody></table></div>

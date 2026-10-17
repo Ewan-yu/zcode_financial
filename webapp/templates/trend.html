@@ -4,20 +4,30 @@
 <header class="page"><h1>情绪时序</h1><span class="date">序列自首个复盘日起前向积累（当前 {{ sents|length }} 天）</span></header>
 {% if sents|length < 2 %}<div class="note warn">情绪指标序列刚起步（{{ sents|length }} 天）——每日复盘自动积累后，此页将呈现涨停数/晋级率/溢价/成交额的多指标曲线与阶段演变。</div>{% endif %}
 <div class="grid">
-  <div class="chart span6"><h3>涨停 / 跌停家数</h3><div class="ec" id="c1"></div></div>
+  <div class="chart span6"><h3>涨停 / 跌停家数（红=涨停 绿=跌停）</h3><div class="ec" id="c1"></div></div>
   <div class="chart span6"><h3>晋级率% / 昨日涨停溢价%</h3><div class="ec" id="c2"></div></div>
   <div class="chart span12"><h3>上证指数与成交额（{{ idx|length }} 日）</h3><div class="ec" id="c3"></div></div>
-  {% if breadth %}<div class="chart span12"><h3>两市涨跌家数（广度）</h3><div class="ec" id="c4"></div></div>{% endif %}
+  <div class="chart span12"><h3>两市涨跌家数（广度）</h3><div class="ec" id="c4"></div>
+    <div style="font-size:12px;color:var(--muted);padding:0 0 6px">广度为快照类数据，无历史口径——自 2026-10-16 起每个交易日向前积累（回补日为空属正常）。</div></div>
 </div>
 <div class="tbl"><h3>明细</h3>
-<table><thead><tr><th>日期</th><th>涨停</th><th>跌停</th><th>高度</th><th>晋级率%</th><th>溢价%</th><th>炸板</th><th>成交额(亿)</th><th>L1</th><th>L2</th><th>组合基调</th></tr></thead><tbody>
-{% for r in sents %}<tr><td>{{ r.date }}</td><td>{{ r.limit_ups }}</td><td>{{ r.limit_downs }}</td><td>{{ r.max_boards }}</td><td>{{ r.promo_rate }}</td><td class="{{ 'down' if (r.premium or 0) < 0 else 'up' }}">{{ r.premium }}</td><td>{{ r.zhaba }}</td><td>{{ r.amount_yi }}</td><td>{{ r.l1 }}</td><td>{{ r.l2 }}</td><td>{{ r.combo_tone }}</td></tr>{% endfor %}
+<table><thead><tr><th>日期</th><th>涨停</th><th>跌停</th><th>高度</th><th>晋级率%</th><th>溢价%</th><th>炸板</th><th>成交额(亿)</th><th>涨/跌家数</th><th>L1</th><th>L2</th><th>组合基调</th></tr></thead><tbody>
+{% for r in sents %}<tr><td><a href="{{ url_for('review', date=r.date) }}">{{ r.date }}</a></td><td class="up">{{ r.limit_ups }}</td><td class="down">{{ r.limit_downs }}</td><td>{{ r.max_boards }}</td><td>{{ r.promo_rate if r.promo_rate is not none else '—' }}</td><td class="{{ 'down' if (r.premium or 0) < 0 else 'up' }}">{{ r.premium if r.premium is not none else '—' }}</td><td>{{ r.zhaba if r.zhaba is not none else '—' }}</td><td>{{ r.amount_yi if r.amount_yi is not none else '—' }}</td><td>{% if bmap.get(r.date) %}{{ bmap[r.date].up_count }} / {{ bmap[r.date].down_count }}{% else %}<span style="color:var(--muted)">—</span>{% endif %}</td><td>{{ r.l1 }}</td><td>{{ r.l2 }}</td><td>{{ r.combo_tone }}</td></tr>{% endfor %}
 </tbody></table></div>
 <script>
 const S = {{ sents | tojson }}, I = {{ idx | tojson }}, B = {{ breadth | tojson }};
 const ds = S.map(r => r.date.slice(5));
-if (S.length) {
-  WB.mkBar('c1', {cats: ds, values: S.map(r => r.limit_ups), colors: '#e5484d'});
+if (S.length && typeof echarts !== 'undefined') {
+  echarts.init(document.getElementById('c1')).setOption({
+    backgroundColor:'transparent',
+    tooltip:{trigger:'axis',backgroundColor:'#1b222c',borderColor:'#2a323e',textStyle:{color:'#d8dee8',fontSize:12}},
+    legend:{textStyle:{color:'#8b95a5',fontSize:11},top:0},
+    grid:{left:46,right:16,top:30,bottom:26},
+    xAxis:{type:'category',data:ds,axisLabel:{color:'#8b95a5',fontSize:11},axisLine:{lineStyle:{color:'#2a323e'}}},
+    yAxis:{type:'value',axisLabel:{color:'#8b95a5',fontSize:11},splitLine:{lineStyle:{color:'rgba(42,50,62,.5)'}}},
+    series:[
+      {name:'涨停家数',type:'bar',data:S.map(r => r.limit_ups),itemStyle:{color:'#e5484d'},barMaxWidth:20},
+      {name:'跌停家数',type:'bar',data:S.map(r => r.limit_downs),itemStyle:{color:'#2fb37c'},barMaxWidth:20}]});
   WB.mkLine('c2', {times: ds, series: [
     {name: '晋级率%', data: S.map(r => r.promo_rate), color: '#4c8dff'},
     {name: '溢价%', data: S.map(r => r.premium), color: '#e2b341'}]});

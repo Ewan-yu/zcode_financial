@@ -17,6 +17,11 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 app = Flask(__name__)
 DB = ROOT / "data" / "workbench.db"
+# 条目代号→中文标题（本地生成：python tools/gen_entries.py；含方法论标题，不入远端）
+ENTRIES = {}
+_ep = ROOT / "data" / "entries.json"
+if _ep.exists():
+    ENTRIES = json.loads(_ep.read_text(encoding="utf-8"))
 STAGES = ["冰点", "启动", "发酵", "高潮", "退潮"]
 STAGE_COLOR = {"冰点": "#8b95a5", "启动": "#4c8dff", "发酵": "#e5484d",
                "高潮": "#e2b341", "退潮": "#2fb37c"}
@@ -105,7 +110,8 @@ def trend():
     sents = q("SELECT * FROM sentiment ORDER BY date")
     idx = q("SELECT date,close,pct,amount_yi FROM market_daily WHERE code='000001.SH' ORDER BY date")
     breadth = q("SELECT date,up_count,down_count FROM market_daily WHERE code='A_SHARE' ORDER BY date")
-    return render_template("trend.html", sents=sents, idx=idx, breadth=breadth)
+    bmap = {r["date"]: r for r in breadth}
+    return render_template("trend.html", sents=sents, idx=idx, breadth=breadth, bmap=bmap)
 
 
 # ---------------- 页面：台账 ----------------
@@ -140,7 +146,8 @@ def ledger():
             else:
                 s["待"] += 1
     by_refs = sorted(by_refs.items(), key=lambda kv: -(kv[1]["对"] + kv[1]["错"] + kv[1]["其他"] + kv[1]["待"]))
-    return render_template("ledger.html", rows=rows, stats=stats, by_dir=by_dir, by_refs=by_refs)
+    return render_template("ledger.html", rows=rows, stats=stats, by_dir=by_dir,
+                           by_refs=by_refs, entries=ENTRIES)
 
 
 # ---------------- 页面：股池 ----------------
@@ -205,6 +212,10 @@ def pool_import():
 def reports():
     rows = q("SELECT id,date,kind,domain,title,conclusion,related_codes,related_sectors"
              " FROM reports ORDER BY date DESC, id DESC")
+    for r in rows:
+        codes = jload(r.get("related_codes"), []) or []
+        sectors = jload(r.get("related_sectors"), []) or []
+        r["related_pretty"] = "、".join(sectors + codes) or "—"
     return render_template("reports.html", rows=rows)
 
 

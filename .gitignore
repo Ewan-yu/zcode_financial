@@ -41,3 +41,4 @@ __pycache__/
 # 系统杂物
 Thumbs.db
 .DS_Store
+data/entries.json
