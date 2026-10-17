@@ -12,6 +12,12 @@ data/snapshots/*
 data/cache/*
 !data/cache/README.md
 
+# 本地数据库与导出备份（数据资产，仅本地）
+data/workbench.db
+data/workbench.db-*
+data/exports/*
+!data/exports/README.md
+
 # 个人投资记录：自选、持仓、预测台账、报告（敏感）
 portfolio/*
 !portfolio/README.md

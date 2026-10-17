@@ -58,12 +58,12 @@ description: 短线盘中盯盘与单票快诊（模块A）。当用户在盘中
    结论：持有 / 卖出检查：三部曲第X条…
    依据：DT-J-022, DT-R-045, DT-R-001
    ```
-5. 产生的可验证判断当场追加 `predictions/predictions.csv`。
+5. 产生的可验证判断当场经 `python tools/db.py add-prediction` 登记台账（权威源）。
 
 **深度模式（盘后/晚间点名"分析一下 XX"、或需要完整复盘某票时启用）**：不走一屏
 短路径，逐节填充 `templates/dt/stock-analysis.md`（结论卡 / 前次判断对账 / 题材定位 /
 日线位置 / 分时承接力指标表 / 情绪环境 / 综合判定 / 台账登记 / 附录A 数据出处），
-跑 lint 自检后交付。同票多次分析必须完整执行，禁止省节。
+跑 lint 自检、`db.py report-add` 入库后交付。同票多次分析必须完整执行，禁止省节。
 
 > 需要图形看板时：基于 `templates/dt/dashboard.html` 骨架的**个股模式**（注入
 > REAL_DATA 且 `meta.type='stock'`，骨架自动渲染六模块：结论 / 前次对账 / 分时承接力

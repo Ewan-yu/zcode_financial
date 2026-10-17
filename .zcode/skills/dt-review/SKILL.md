@@ -130,10 +130,14 @@ description: 短线晚间复盘与选股推荐（模块A核心技能）。当用
 - 用户在会话中随时可说"把 XXX 加入自选 / 移出 XXX"——按同样字段规范执行，加入时
   必须问清或推断观察要点与移出条件（无条件的观察是无效跟踪）
 - 买入发生时：status 改为 持仓 + positions.md 记账；卖出后改回 观察中 或移出
+- 入池/移出/池间转移一律经 `python tools/db.py pool add|remove|move` 落库
+  （dt_watchlist 股池；watchlist.json 为导出件）
 
 ## 第 6 步：次日预判登记（DT-J-004 预判-验证循环）
 
-每只 A/B 级候选 + 全部持仓，追加写入 `predictions/predictions.csv`：
+每只 A/B 级候选 + 全部持仓，经 `python tools/db.py add-prediction --date D --code ...
+--name ... --direction ... --content "..." --refs ... --trigger ... --invalid ...
+--timeframe "1个交易日"` 登记台账（权威源 workbench.db；predictions.csv 已冻结为存档）：
 - 判断内容 = 次日预期开盘方式与强弱（如"高开2-4%维持红盘"）
 - 依据条目 = DT-xx-nnn；触发/目标条件与失效条件写具体可验证口径
 - 时间框架 = 1 个交易日
@@ -155,8 +159,10 @@ description: 短线晚间复盘与选股推荐（模块A核心技能）。当用
    `::visualize{"path":"<绝对路径>"}` 独占一行引用**（不要用 Markdown 链接——
    只写文件不引用等于没做）。
 4. 静态副本存 `reports/daily/D/看板.html`（骨架即独立 HTML，直接复制即存档）。
-5. **自检**：`python tools/report_lint.py reports/daily/D/晚间复盘.md --type review
-   --dashboard reports/daily/D/看板.html` 全部通过才算交付。
+5. **自检与写库**：`python tools/report_lint.py reports/daily/D/晚间复盘.md --type review
+   --dashboard reports/daily/D/看板.html` 全部通过；随后写库收尾——`db.py import-day D`
+   （情绪/板块/候选/龙虎榜，需先落盘当日快照与 candidates.json）+ `db.py report-add`
+   （本报告 md 全文）+ `db.py export D`（备份）。全部完成才算交付。
 - **看板用语规范（2026-10-17 用户反馈）**：面向用户的看板**禁用条目代号**
   （DT-J-0xx 等用户看不懂），改用规则名+一句话说明（如"退潮期：高位断板多、追高亏钱，
   不接力"）；溯源代号只出现在 md 报告中。除非用户主动要求附代号对照表。

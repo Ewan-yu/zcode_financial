@@ -17,7 +17,7 @@ description: 短线盘前简报（模块A）。当用户在交易日早上说"�
    就明说，不用"大概"补）。
 4. **模板锁定**：完整存档逐节按 `templates/dt/pre-briefing.md` 填充，交付前跑
    `python tools/report_lint.py <报告> --type briefing` 自检。
-5. **判断留痕**：基调修正等可验证判断当场入台账。
+5. **判断留痕**：基调修正等可验证判断当场经 `db.py add-prediction` 入台账（权威源）。
 
 ## 流程（08:45-09:15 窗口）
 
