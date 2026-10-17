@@ -24,7 +24,11 @@
     <tr><td>{{ p.reg_date }}</td>
         <td>{% if p.code != 'MARKET' %}<a href="{{ url_for('stock', code=p.code) }}">{{ p.name }}</a>{% else %}{{ p.name }}{% endif %}</td>
         <td>{{ p.direction }}</td>
-        <td>{{ (p.content or '')[:34] }}{% if (p.content or '')|length > 34 %}…{% endif %}</td>
+        <td><details style="font-size:12px"><summary style="cursor:pointer">{{ (p.content or '')[:30] }}…（展开全文）</summary>
+          <div style="padding:5px 0;color:var(--text);line-height:1.6">{{ p.content }}</div>
+          {% if p.trigger_cond %}<div><span class="up">▲ 介入/触发</span> {{ p.trigger_cond }}</div>{% endif %}
+          {% if p.invalid_cond %}<div><span class="down">▼ 失效/止损</span> {{ p.invalid_cond }}</div>{% endif %}
+        </details></td>
         <td class="{{ 'up' if p.result == '对' else 'down' if p.result == '错' else 'warn' }}">{{ p.result or '待验证' }}</td></tr>
     {% else %}<tr><td colspan="5">无</td></tr>{% endfor %}
     </tbody></table>

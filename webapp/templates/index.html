@@ -31,17 +31,26 @@
 <div class="sec"><h2>当日候选与观察标的 <span class="sub">五维评分与指标参考组</span></h2>
 <div class="cands" id="cands"></div></div>
 
-<div class="grid">
-  <div class="tbl span6"><h3>待验证台账判断</h3>
-    <table><thead><tr><th>登记</th><th>标的</th><th>方向</th><th>判断</th></tr></thead><tbody>
-    {% for p in pending %}<tr><td>{{ p.reg_date }}</td><td><a href="{{ url_for('stock', code=p.code) }}">{{ p.name }}</a></td><td>{{ p.direction }}</td><td>{{ (p.content or '')[:46] }}…</td></tr>
-    {% else %}<tr><td colspan="4">无</td></tr>{% endfor %}</tbody></table>
+<div class="sec"><h2>下一交易日操作指导 <span class="sub">待验证台账——判断全文与触发/失效条件（收盘后对照执行）</span></h2>
+<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(390px,1fr))">
+{% for p in pending %}
+<div class="card" style="padding:10px 14px">
+  <div class="k" style="display:flex;justify-content:space-between;align-items:baseline">
+    <span><b style="color:var(--text);font-size:14px">{% if p.code != 'MARKET' %}<a href="{{ url_for('stock', code=p.code) }}">{{ p.name }}</a> <span style="font-size:11px">{{ p.code }}</span>{% else %}{{ p.name }}{% endif %}</b>
+      <span class="badge {{ 'up' if '多' in (p.direction or '') else 'down' if '空' in (p.direction or '') else 'warn' }}" style="margin-left:6px">{{ p.direction }}</span></span>
+    <span style="font-size:11px">登记 {{ p.reg_date }} · 验证 {{ p.verify_date or p.timeframe or '—' }}</span>
   </div>
-  <div class="tbl span6"><h3>最新报告</h3>
-    <table><thead><tr><th>日期</th><th>类型</th><th>标题</th></tr></thead><tbody>
-    {% for r in reports %}<tr><td>{{ r.date }}</td><td>{{ r.kind }}</td><td><a href="{{ url_for('report_detail', rid=r.id) }}">{{ r.title }}</a></td></tr>
-    {% else %}<tr><td colspan="3">无</td></tr>{% endfor %}</tbody></table>
-  </div>
+  <div style="font-size:12.5px;margin:7px 0;line-height:1.65;color:var(--text)">{{ p.content }}</div>
+  {% if p.trigger_cond %}<div class="s" style="margin-top:5px"><span class="up">▲ 介入/触发</span>　{{ p.trigger_cond }}</div>{% endif %}
+  {% if p.invalid_cond %}<div class="s" style="margin-top:3px"><span class="down">▼ 失效/止损</span>　{{ p.invalid_cond }}</div>{% endif %}
+</div>
+{% else %}<div class="note">当前无待验证判断。</div>{% endfor %}
+</div></div>
+
+<div class="tbl"><h3>最新报告</h3>
+  <table><thead><tr><th>日期</th><th>类型</th><th>标题</th><th>结论</th></tr></thead><tbody>
+  {% for r in reports %}<tr><td>{{ r.date }}</td><td>{{ r.kind }}</td><td><a href="{{ url_for('report_detail', rid=r.id) }}">{{ r.title }}</a></td><td>{{ (r.conclusion or '')[:46] }}{% if (r.conclusion or '')|length > 46 %}…{% endif %}</td></tr>
+  {% else %}<tr><td colspan="4">无</td></tr>{% endfor %}</tbody></table>
 </div>
 
 <div class="sec"><h2>股池 <span class="sub">长期运作的标的台账</span></h2>
