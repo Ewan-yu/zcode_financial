@@ -28,5 +28,5 @@
 10. **输出语言**：中文。
 11. **版本控制**：远端仓库（GitHub，公开）只保存源码、配置与模板；个人数据与知识资产
    （raw 原始资料、distilled 方法论、data/ 数据、portfolio 实际持仓、predictions 台账、
-   reports 报告）仅存本地，由 `.gitignore` 强制排除。禁止用 `git add -f` 绕过；
-   提交前如新增文件位于这些目录，须确认未被误加。
+   reports 报告、docs/ 模块设计文档——含方法论流程细节）仅存本地，由 `.gitignore` 强制排除。
+   禁止用 `git add -f` 绕过；提交前如新增文件位于这些目录，须确认未被误加。

@@ -22,6 +22,9 @@ predictions/*
 reports/*
 !reports/README.md
 
+# 模块设计文档：含方法论流程细节，仅本地
+docs/*
+
 # 可能含密钥的项目级 MCP 配置
 .zcode/config.json
 
