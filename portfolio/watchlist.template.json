@@ -1,5 +1,12 @@
 {
-  "_说明": "统一自选池模板。复制为 watchlist.json 后填写。asset_type: stock(A股) / etf(场内ETF、LOF) / of_fund(场外基金)。场内标的参与每日盯盘与复盘；场外基金按周跟踪净值。method_refs 引用 knowledge/distilled 中的方法论条目编号。",
+  "_说明": "统一自选池（观察池）。复制为 watchlist.json 后使用。核心是生命周期管理：复盘筛选出的 A/B 级候选自动/手动加入（status=观察中），每日复盘逐票复查，按 invalid_if 或观察超期移出（移入 archived 留痕）。持仓是自选池的子集（status=持仓，另在 positions.md 记账）。",
+  "_字段说明": {
+    "status": "观察中 | 重点 | 持仓 | 已结束",
+    "add_reason": "加入原因（复盘定级依据 / 用户指定，引用方法论条目）",
+    "observe_points": "观察要点（每日复查盯着什么看）",
+    "invalid_if": "移出条件（预期兑现、失效或观察超期）",
+    "days_watched": "观察交易日数（复盘自动累计，>10 日无进展提示清理）"
+  },
   "updated_at": "",
   "items": [
     {
@@ -7,28 +14,52 @@
       "name": "示例-贵州茅台",
       "asset_type": "stock",
       "style": ["趋势", "波段"],
+      "status": "观察中",
       "added": "",
+      "add_reason": "示例：替换为真实自选",
+      "observe_points": "",
+      "invalid_if": "",
+      "days_watched": 0,
       "method_refs": [],
-      "note": "示例条目：替换为真实自选股"
+      "note": ""
     },
     {
       "code": "510300.SH",
       "name": "示例-沪深300ETF",
       "asset_type": "etf",
       "style": ["底仓", "网格"],
+      "status": "观察中",
       "added": "",
+      "add_reason": "示例：场内ETF，纳入每日复查",
+      "observe_points": "",
+      "invalid_if": "",
+      "days_watched": 0,
       "method_refs": [],
-      "note": "示例条目：场内ETF，走每日盯盘循环（wind-fund 行情）"
+      "note": ""
     },
     {
       "code": "005827.OF",
       "name": "示例-易方达蓝筹精选",
       "asset_type": "of_fund",
       "style": ["长线定投"],
+      "status": "观察中",
       "track_freq": "weekly",
       "added": "",
+      "add_reason": "示例：场外基金，周度跟踪净值与持仓风格",
+      "observe_points": "",
+      "invalid_if": "",
+      "days_watched": 0,
       "method_refs": [],
-      "note": "示例条目：场外基金，周度跟踪净值与持仓风格"
+      "note": ""
+    }
+  ],
+  "archived": [
+    {
+      "code": "示例-000000.SZ",
+      "name": "已移出标的留痕",
+      "removed": "",
+      "remove_reason": "预期兑现 / 失效（触发invalid_if）/ 观察超期",
+      "outcome": "观察期间涨跌与预判对错简记"
     }
   ]
 }
