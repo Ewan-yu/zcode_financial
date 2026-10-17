@@ -62,8 +62,9 @@ header.bar .date{color:var(--muted);font-size:13px}
 .chart{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px 6px}
 .chart h3{margin:2px 0 6px;font-size:13px;color:var(--muted);font-weight:600}
 .chart .ec{width:100%;height:250px}
-.span6{grid-column:span 6}.span12{grid-column:span 12}.span4{grid-column:span 4}.span8{grid-column:span 8}
-@media (max-width:780px){.span6,.span4,.span8{grid-column:span 12}}
+.span5{grid-column:span 5}.span6{grid-column:span 6}.span7{grid-column:span 7}
+.span12{grid-column:span 12}.span4{grid-column:span 4}.span8{grid-column:span 8}
+@media (max-width:820px){.span5,.span6,.span7,.span4,.span8{grid-column:span 12}}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{color:var(--muted);font-weight:600;text-align:left;border-bottom:1px solid var(--line);
   padding:6px 8px;white-space:nowrap}
@@ -75,7 +76,7 @@ td.cold,span.cold{color:var(--accent)}
   padding:10px 12px;overflow-x:auto}
 .tbl h3{margin:2px 0 8px;font-size:13px;color:var(--muted);font-weight:600}
 /* 推荐标的卡 */
-.cands{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:10px}
+.cands{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px}
 .cand{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
 .cand-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .cand-h b{font-size:16px}
@@ -132,7 +133,14 @@ function gradeClass(g){return g==='优'?'up':(g==='中'?'warn':'down');}
 function esc(s){return String(s==null?'—':s);}
 function card(k,v,s,tone){return `<div class="card"><div class="k">${esc(k)}</div>
   <div class="v ${tone||''}">${esc(v)}</div><div class="s">${esc(s||'')}</div></div>`;}
-function chart(el){return echarts.init(document.getElementById(el),null,{renderer:'canvas'});}
+function chart(el){
+  const host=document.getElementById(el);
+  if(typeof echarts==='undefined'){ /* IDE 内置浏览器等环境可能拦截 CDN——降级为提示，不阻塞整页渲染 */
+    host.innerHTML='<div style="color:var(--muted);font-size:12px;padding:24px 10px;text-align:center">图表组件未能加载（当前环境限制了外部脚本），关键数值见相邻表格与卡片。</div>';
+    return {setOption(){},resize(){}};
+  }
+  return echarts.init(host,null,{renderer:'canvas'});
+}
 function h(tag,cls,html){return `<${tag} class="${cls||''}">${html||''}</${tag}>`;}
 function sec(title,sub,inner){return `<section class="sec"><h2>${title}
   <span class="sub">${sub||''}</span></h2>${inner}</section>`;}
@@ -169,7 +177,7 @@ function mkBar(id,{cats,values,colors,unit,horizontal}){
   chart(id).setOption({backgroundColor:'transparent',
     tooltip:{trigger:'item',backgroundColor:'#1b222c',borderColor:LINE,
       textStyle:{color:TEXT,fontSize:12},formatter:p=>`${p.name}：${p.value}${unit||''}`},
-    grid:horizontal?{left:110,right:44,top:8,bottom:26}:grid,
+    grid:horizontal?{left:96,right:40,top:8,bottom:26}:grid,
     xAxis:{type:horizontal?'value':'category',data:horizontal?undefined:cats,...AXIS},
     yAxis:{type:horizontal?'category':'value',data:horizontal?cats:undefined,...AXIS},
     series:[{type:'bar',data:(values||[]).map((v,i)=>({value:v,
@@ -283,7 +291,9 @@ function renderReview(D){
     `<div class="tbl">${tbl(['登记日','标的','方向','判断摘要','验证日','状态'],L.rows)}</div>`);
 
   app.innerHTML=html;
-  chartJobs.forEach(f=>f());
+  chartJobs.forEach(f=>{try{f();}catch(e){}});
+  window.addEventListener('resize',()=>{clearTimeout(window.__rsT);
+    window.__rsT=setTimeout(()=>{chartJobs.forEach(f=>{try{f();}catch(e){}});},200);});
 }
 
 /* ================= 数据入口 ================= */
