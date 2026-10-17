@@ -5,10 +5,11 @@
   <span class="date">实证校准数据流 · 全部短线性质、依行情灵活进出（同一票可反复做）</span></header>
 
 <div class="cards">
-  <div class="card"><div class="k">记录数</div><div class="v">{{ stats.记录数 }}</div><div class="s">入选日 × 标的</div></div>
+  <div class="card"><div class="k">记录数</div><div class="v">{{ stats.记录数 }}</div><div class="s">{{ stats.状态分布 }}</div></div>
   <div class="card"><div class="k">标的数</div><div class="v">{{ stats.标的数 }}</div></div>
-  <div class="card"><div class="k">T+1 平均收益</div><div class="v {{ 'down' if (stats['T+1均值%'] or 0) < 0 else 'up' }}">{{ stats['T+1均值%'] if stats['T+1均值%'] is not none else '—' }}%</div><div class="s">入选日收盘→次日收盘</div></div>
+  <div class="card"><div class="k">T+1 平均收益</div><div class="v {{ 'down' if (stats['T+1均值%'] or 0) < 0 else 'up' }}">{{ stats['T+1均值%'] if stats['T+1均值%'] is not none else '—' }}%</div><div class="s">观察日收盘→次日收盘（选择力）</div></div>
   <div class="card"><div class="k">T+1 平均冲高回落</div><div class="v warn">{{ stats['T+1平均冲高回落%'] if stats['T+1平均冲高回落%'] is not none else '—' }}%</div><div class="s">次日高点→收盘</div></div>
+  <div class="card"><div class="k">操作盈亏均值</div><div class="v">{{ stats['操作盈亏均值%'] if stats['操作盈亏均值%'] is not none else '—' }}{% if stats['操作盈亏均值%'] is not none %}%{% endif %}</div><div class="s">有买卖价的笔（操作力）</div></div>
 </div>
 
 {% if profile %}
@@ -34,21 +35,21 @@
 <div class="sec"><h2>入选记录 <span class="sub">点击行展开入选日特征与前向收益全文</span></h2>
 <div class="tbl">
 <table>
-<thead><tr><th>入选日</th><th>标的</th><th>板块/结构</th><th>入选日换手</th><th>距5日高点</th><th>T+1 开/高/收</th><th>冲高回落</th><th>操作</th></tr></thead><tbody>
+<thead><tr><th>观察日</th><th>标的</th><th>买入 → 卖出</th><th>观察→卖出</th><th>状态</th><th>板块/结构</th><th>T+1 开/高/收</th><th>操作盈亏</th></tr></thead><tbody>
 {% for r in recs %}
 <tr>
-  <td>{{ r.date }}</td>
+  <td>{{ r.watch_date or r.date }}</td>
   <td><a href="{{ url_for('stock', code=r.code) }}">{{ r.name }}</a></td>
+  <td>{{ r.buy_date or '<span style="color:var(--muted)">未提供</span>' | safe }} → {{ r.sell_date or '—' }}</td>
+  <td>{{ r.days if r.days is not none else '—' }} 天</td>
+  <td><span class="badge {{ 'cold' if r.status == '已了结' else 'up' if r.status == '持有中' else 'warn' }}">{{ r.status }}</span></td>
   <td class="cold">{{ (r.f.get('启动以来') or '')[:14] }}</td>
-  <td>{{ r.f.get('入选日换手%') or '—' }}%</td>
-  <td>{{ r.f.get('距近5日高点%') if r.f.get('距近5日高点%') is not none else '—' }}%</td>
   <td>{% set w = r.w %}{% if w.get('t1_open%') is not none %}
       <span class="{{ 'up' if w['t1_open%'] > 0 else 'down' }}">{{ w['t1_open%'] }}%</span> /
       <span class="{{ 'up' if w['t1_high%'] > 0 else 'down' }}">{{ w['t1_high%'] }}%</span> /
       <span class="{{ 'up' if w['t1_close%'] > 0 else 'down' }}">{{ w['t1_close%'] }}%</span>
       {% else %}待积累{% endif %}</td>
-  <td class="warn">{{ w.get('t1_冲高回落%') if w.get('t1_冲高回落%') is not none else '—' }}%</td>
-  <td class="cold">{{ w.get('author_action') or '持有中' }}</td>
+  <td>{% if r.op_ret is not none %}<span class="{{ 'up' if r.op_ret > 0 else 'down' }}">{{ r.op_ret }}%</span>{% else %}—{% endif %}</td>
 </tr>
 <tr><td colspan="8" style="padding:0"><details style="font-size:12px;padding:6px 8px;background:rgba(42,50,62,.18)">
   <summary style="cursor:pointer;color:var(--muted)">展开特征与前向全文</summary>

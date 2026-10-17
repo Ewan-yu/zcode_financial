@@ -132,9 +132,11 @@ CREATE TABLE IF NOT EXISTS trade_events (
 CREATE TABLE IF NOT EXISTS youzi_picks (
   date TEXT, code TEXT, name TEXT,
   note TEXT,                          -- 柚子哥理由/用户转述备注
-  entry_ref REAL,                     -- 参考介入价（如提供）
+  entry_ref REAL,                     -- 参考介入价（买入价，如提供）
   features TEXT,                      -- 入选日特征快照 JSON
-  fwd TEXT,                           -- 前向收益 JSON {t1_open,t1_high,t1,t3,t5,t10,...}
+  fwd TEXT,                           -- 前向收益 JSON（以观察日/名单日为基准）
+  watch_date TEXT, buy_date TEXT, sell_date TEXT,  -- 生命周期三时点（用户要求必记）
+  sell_price REAL,                    -- 卖出价（如提供，与 entry_ref 算操作盈亏）
   PRIMARY KEY(date, code)
 );
 CREATE TABLE IF NOT EXISTS macro (
