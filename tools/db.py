@@ -145,8 +145,8 @@ CREATE TABLE IF NOT EXISTS macro (
 PRESET_POOLS = [
     ("dt_watchlist", "短线自选池", "DT", "system",
      "dt-review A级入池；status/horizon/days_watched 生命周期，标准票>10日无进展移出"),
-    ("youzi_short", "柚子哥短线池", "DT", "youzi", "柚子哥每日名单（实证校准数据流）"),
-    ("youzi_long", "柚子哥长线池", "VF", "youzi", "柚子哥长线标的（模块B对照）"),
+    ("youzi", "柚子哥标的池", "DT", "youzi",
+     "全部短线性质、依行情灵活进出（无长线池；同一票可视行情反复做）——实证校准数据流"),
     ("dt_rejected", "短线淘汰池", "DT", "system",
      "复盘剔除/门槛拦截/自选移出；前向跟踪检验假阴性"),
 ]
@@ -355,8 +355,8 @@ def _ensure_pool(conn, key, date):
     row = conn.execute("SELECT 1 FROM pools WHERE key=?", (key,)).fetchone()
     if not row:
         conn.execute("INSERT INTO pools VALUES (?,?,?,?,'',?,1)",
-                     (key, key, "DT" if key.startswith(("dt_", "youzi_")) else "VF",
-                      "youzi" if key.startswith("youzi_") else "user", date))
+                     (key, key, "DT" if key.startswith(("dt_", "youzi")) else "VF",
+                      "youzi" if key.startswith("youzi") else "user", date))
 
 
 def cmd_pool(a):
