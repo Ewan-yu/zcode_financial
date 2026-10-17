@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}情绪时序 · 复盘工作台{% endblock %}
+{% block content %}
+<header class="page"><h1>情绪时序</h1><span class="date">序列自首个复盘日起前向积累（当前 {{ sents|length }} 天）</span></header>
+{% if sents|length < 2 %}<div class="note warn">情绪指标序列刚起步（{{ sents|length }} 天）——每日复盘自动积累后，此页将呈现涨停数/晋级率/溢价/成交额的多指标曲线与阶段演变。</div>{% endif %}
+<div class="grid">
+  <div class="chart span6"><h3>涨停 / 跌停家数</h3><div class="ec" id="c1"></div></div>
+  <div class="chart span6"><h3>晋级率% / 昨日涨停溢价%</h3><div class="ec" id="c2"></div></div>
+  <div class="chart span12"><h3>上证指数与成交额（{{ idx|length }} 日）</h3><div class="ec" id="c3"></div></div>
+  {% if breadth %}<div class="chart span12"><h3>两市涨跌家数（广度）</h3><div class="ec" id="c4"></div></div>{% endif %}
+</div>
+<div class="tbl"><h3>明细</h3>
+<table><thead><tr><th>日期</th><th>涨停</th><th>跌停</th><th>高度</th><th>晋级率%</th><th>溢价%</th><th>炸板</th><th>成交额(亿)</th><th>L1</th><th>L2</th><th>组合基调</th></tr></thead><tbody>
+{% for r in sents %}<tr><td>{{ r.date }}</td><td>{{ r.limit_ups }}</td><td>{{ r.limit_downs }}</td><td>{{ r.max_boards }}</td><td>{{ r.promo_rate }}</td><td class="{{ 'down' if (r.premium or 0) < 0 else 'up' }}">{{ r.premium }}</td><td>{{ r.zhaba }}</td><td>{{ r.amount_yi }}</td><td>{{ r.l1 }}</td><td>{{ r.l2 }}</td><td>{{ r.combo_tone }}</td></tr>{% endfor %}
+</tbody></table></div>
+<script>
+const S = {{ sents | tojson }}, I = {{ idx | tojson }}, B = {{ breadth | tojson }};
+const ds = S.map(r => r.date.slice(5));
+if (S.length) {
+  WB.mkBar('c1', {cats: ds, values: S.map(r => r.limit_ups), colors: '#e5484d'});
+  WB.mkLine('c2', {times: ds, series: [
+    {name: '晋级率%', data: S.map(r => r.promo_rate), color: '#4c8dff'},
+    {name: '溢价%', data: S.map(r => r.premium), color: '#e2b341'}]});
+}
+if (I.length) WB.mkIdxTrend('c3', {dates: I.map(r => r.date.slice(5)), close: I.map(r => r.close), amount: I.map(r => r.amount_yi)});
+if (B.length) WB.mkLine('c4', {times: B.map(r => r.date.slice(5)), series: [
+  {name: '上涨家数', data: B.map(r => r.up_count), color: '#e5484d'},
+  {name: '下跌家数', data: B.map(r => r.down_count), color: '#2fb37c'}]});
+</script>
+{% endblock %}

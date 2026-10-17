@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}报告中心 · 复盘工作台{% endblock %}
+{% block content %}
+<header class="page"><h1>报告中心</h1><span class="date">md 全文入库 · 按标的/板块关联检索</span></header>
+<div class="tbl">
+<table><thead><tr><th>日期</th><th>类型</th><th>域</th><th>标题</th><th>结论</th><th>关联</th></tr></thead><tbody>
+{% for r in rows %}
+<tr>
+  <td>{{ r.date }}</td><td>{{ r.kind }}</td><td>{{ r.domain }}</td>
+  <td><a href="{{ url_for('report_detail', rid=r.id) }}">{{ r.title }}</a></td>
+  <td>{{ (r.conclusion or '')[:60] }}</td>
+  <td class="cold">{% set cs = (r.related_codes or '[]') | safe %}{{ (r.related_sectors or '') if r.related_sectors else '' }}</td>
+</tr>
+{% else %}<tr><td colspan="6">暂无报告</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

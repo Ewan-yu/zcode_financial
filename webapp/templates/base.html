@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}复盘工作台{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/board.css') }}">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="{{ url_for('static', filename='js/board.js') }}"></script>
+</head>
+<body>
+<nav class="bar">
+  <span class="brand">复盘工作台</span>
+  <a href="{{ url_for('index') }}">总览</a>
+  <a href="{{ url_for('trend') }}">情绪时序</a>
+  <a href="{{ url_for('ledger') }}">台账</a>
+  <a href="{{ url_for('pools') }}">股池</a>
+  <a href="{{ url_for('reports') }}">报告中心</a>
+  {% if latest_review %}<a href="{{ url_for('review', date=latest_review) }}">最新复盘</a>{% endif %}
+</nav>
+<div class="wrap">
+{% block content %}{% endblock %}
+<footer>数据源：workbench.db（本地权威库） · webapp 只读（写仅股池导入） · <b>仅供个人研究，不构成投资建议</b></footer>
+</div>
+</body>
+</html>

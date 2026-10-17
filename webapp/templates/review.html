@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ date }} 复盘 · 复盘工作台{% endblock %}
+{% block content %}
+<header class="page">
+  <h1 id="h-title">复盘</h1>
+  <span class="date" id="h-date"></span>
+  <span class="badge" id="h-badge"></span>
+</header>
+<div id="app"></div>
+<footer><b>数据出处</b>：<span id="prov-body"></span>（webapp 从 workbench.db 组装；门槛四条件全文见当日报告）</footer>
+<script>
+const REAL_DATA = {{ data | tojson }};
+WB.render(REAL_DATA);
+</script>
+{% endblock %}

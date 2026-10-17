@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}台账 · 复盘工作台{% endblock %}
+{% block content %}
+<header class="page"><h1>判断台账</h1><span class="date">预判-验证循环 · 判涨实涨/判涨实跌/判跌实涨(认错)/判跌实跌</span></header>
+<div class="cards">
+  <div class="card"><div class="k">总判断</div><div class="v">{{ stats.总判断 }}</div></div>
+  <div class="card"><div class="k">待验证</div><div class="v warn">{{ stats.待验证 }}</div></div>
+  <div class="card"><div class="k">对 / 错</div><div class="v"><span class="up">{{ stats.对 }}</span> / <span class="down">{{ stats.错 }}</span></div></div>
+  <div class="card"><div class="k">胜率</div><div class="v">{{ stats.胜率 if stats.胜率 is not none else '—' }}{% if stats.胜率 is not none %}%{% endif %}</div><div class="s">大样本才有意义</div></div>
+</div>
+{% if by_dir %}<div class="note">按方向：{% for k, v in by_dir.items() %}{{ k }} → 对{{ v.对 }}/错{{ v.错 }}{% if v.其他 %}/其他{{ v.其他 }}{% endif %}　{% endfor %}</div>{% endif %}
+<div class="tbl">
+<table>
+<thead><tr><th>id</th><th>登记</th><th>标的</th><th>方向</th><th>判断内容</th><th>依据</th><th>验证</th><th>结果</th></tr></thead>
+<tbody>
+{% for r in rows %}
+<tr>
+  <td>{{ r.id }}</td><td>{{ r.reg_date }}</td>
+  <td>{% if r.code != 'MARKET' %}<a href="{{ url_for('stock', code=r.code) }}">{{ r.name }}</a>{% else %}{{ r.name }}{% endif %}</td>
+  <td>{{ r.direction }}</td><td>{{ r.content }}</td><td class="cold">{{ r.refs }}</td>
+  <td>{{ r.verify_date or r.timeframe or '' }}</td>
+  <td class="{{ 'up' if r.result == '对' else 'down' if r.result == '错' else 'warn' }}">{{ r.result or '待验证' }}</td>
+</tr>
+{% endfor %}
+</tbody></table></div>
+{% endblock %}

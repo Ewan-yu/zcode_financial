@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ r.title }} · 报告{% endblock %}
+{% block content %}
+<header class="page"><h1>{{ r.title }}</h1>
+  <span class="date">{{ r.date }} · {{ r.kind }} · {{ r.domain }} · <a href="{{ url_for('reports') }}">返回列表</a></span></header>
+{% if r.conclusion %}<div class="note"><b>结论：</b>{{ r.conclusion }}</div>{% endif %}
+<div class="md" id="md"></div>
+<script src="https://cdn.jsdelivr.net/npm/marked@11.2.0/marked.min.js"></script>
+<script>
+document.getElementById('md').innerHTML = marked.parse({{ r.content_md | tojson }});
+</script>
+{% endblock %}

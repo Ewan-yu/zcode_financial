@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ p.title }} · 复盘工作台{% endblock %}
+{% block content %}
+<header class="page"><h1>{{ p.title }}</h1><span class="date">{{ p.key }} · {{ p.description or '' }}</span></header>
+{% if imported %}<div class="note">导入完成：新增 {{ imported }} 只。</div>{% endif %}
+<div class="grid">
+  <div class="tbl span7"><h3>当前成员（{{ members|length }}）</h3>
+  <table><thead><tr><th>代码</th><th>名称</th><th>加入日</th><th>状态</th><th>horizon</th><th>备注</th></tr></thead><tbody>
+  {% for m in members %}<tr><td><a href="{{ url_for('stock', code=m.code) }}">{{ m.code }}</a></td><td>{{ m.name }}</td><td>{{ m.added }}</td><td>{{ m.status }}</td><td>{{ m.horizon or '标准' }}</td><td>{{ m.note or '' }}</td></tr>
+  {% else %}<tr><td colspan="6">（空池——可用下方导入或会话 db.py pool add 添加）</td></tr>{% endfor %}
+  </tbody></table></div>
+  <div class="span5">
+    <div class="tbl"><h3>自助导入</h3>
+      <form method="post" action="{{ url_for('pool_import') }}">
+        <p style="color:var(--muted);font-size:12.5px">每行一只：<code>代码,名称,备注</code> 或 <code>代码:名称</code>（# 开头为注释行）。也可填新池名（小写字母/数字/下划线，user_ 前缀建议）。</p>
+        <input type="text" name="pool" value="{{ p.key }}" placeholder="池 key（如 author_short 或 user_my2026）" required>
+        <textarea name="text" placeholder="600825.SH,新华传媒,情绪风向标&#10;000887.SZ,中鼎股份,低空经济" style="margin:8px 0"></textarea>
+        <button class="btn" type="submit">导入</button>
+      </form>
+    </div>
+  </div>
+</div>
+<div class="tbl" style="margin-top:10px"><h3>事件时间线</h3>
+<table><thead><tr><th>日期</th><th>标的</th><th>事件</th><th>原因</th><th>附加</th></tr></thead><tbody>
+{% for e in events %}<tr><td>{{ e.date }}</td><td>{{ e.name or e.code }}</td><td>{{ e.event }}</td><td>{{ e.reason or '' }}</td><td class="cold">{{ e.extra or '' }}</td></tr>
+{% else %}<tr><td colspan="5">暂无</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

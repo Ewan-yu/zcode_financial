@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}总览 · 复盘工作台{% endblock %}
+{% block content %}
+<header class="page"><h1>总览</h1><span class="date">{{ d or '无数据' }}{% if s %} · {{ s.combo_tone }}{% endif %}</span></header>
+
+{% if not s %}
+<div class="note down">库中暂无情绪数据——首个交易日晚间复盘执行 db.py import-day 后此处点亮。</div>
+{% else %}
+<div class="cards">
+  <div class="card"><div class="k">组合基调</div><div class="v down">{{ s.combo_tone or '—' }}</div><div class="s">{{ s.l1 }} × {{ s.l2 }}</div></div>
+  <div class="card"><div class="k">涨停 / 跌停</div><div class="v">{{ s.limit_ups }} / {{ s.limit_downs }}</div><div class="s">非ST</div></div>
+  <div class="card"><div class="k">晋级率 / 溢价</div><div class="v">{{ s.promo_rate }}% / {{ s.premium }}%</div><div class="s">高度 {{ s.max_boards }} 板</div></div>
+  <div class="card"><div class="k">两市成交额</div><div class="v">{{ s.amount_yi }} 亿</div><div class="s">{% if breadth %}涨 {{ breadth.up_count }} / 跌 {{ breadth.down_count }}{% endif %}</div></div>
+  {% for k, v in stats.items() %}<div class="card"><div class="k">{{ k }}</div><div class="v">{{ v }}</div></div>{% endfor %}
+</div>
+<div id="strip1"></div>
+<div class="grid">
+  <div class="chart span8"><h3>上证指数（收盘 / 20日线 / 成交额）</h3><div class="ec" id="ch-idx"></div></div>
+  <div class="tbl span4"><h3>博弈层六指标</h3>
+    <table><tbody>
+      <tr><td>涨停家数</td><td>{{ s.limit_ups }}</td></tr>
+      <tr><td>跌停家数</td><td>{{ s.limit_downs }}</td></tr>
+      <tr><td>最高连板</td><td>{{ s.max_boards }} 板 · {{ s.max_board_stock or '' }}</td></tr>
+      <tr><td>连板晋级率</td><td>{{ s.promo_rate }}%</td></tr>
+      <tr><td>昨日涨停溢价</td><td class="{{ 'down' if (s.premium or 0) < 0 else 'up' }}">{{ s.premium }}%</td></tr>
+      <tr><td>炸板家数</td><td>{{ s.zhaba }}</td></tr>
+    </tbody></table>
+  </div>
+</div>
+
+<div class="sec"><h2>当日候选与观察标的 <span class="sub">五维评分与指标参考组</span></h2>
+<div class="cands" id="cands"></div></div>
+
+<div class="grid">
+  <div class="tbl span6"><h3>待验证台账判断</h3>
+    <table><thead><tr><th>登记</th><th>标的</th><th>方向</th><th>判断</th></tr></thead><tbody>
+    {% for p in pending %}<tr><td>{{ p.reg_date }}</td><td><a href="{{ url_for('stock', code=p.code) }}">{{ p.name }}</a></td><td>{{ p.direction }}</td><td>{{ (p.content or '')[:46] }}…</td></tr>
+    {% else %}<tr><td colspan="4">无</td></tr>{% endfor %}</tbody></table>
+  </div>
+  <div class="tbl span6"><h3>最新报告</h3>
+    <table><thead><tr><th>日期</th><th>类型</th><th>标题</th></tr></thead><tbody>
+    {% for r in reports %}<tr><td>{{ r.date }}</td><td>{{ r.kind }}</td><td><a href="{{ url_for('report_detail', rid=r.id) }}">{{ r.title }}</a></td></tr>
+    {% else %}<tr><td colspan="3">无</td></tr>{% endfor %}</tbody></table>
+  </div>
+</div>
+
+<div class="sec"><h2>股池 <span class="sub">长期运作的标的台账</span></h2>
+<div class="cards">{% for p in pools %}<a class="card" style="color:inherit" href="{{ url_for('pool_detail', key=p.key) }}"><div class="k">{{ p.key }}</div><div class="v">{{ p.c }} 只</div><div class="s">{{ p.title }}</div></a>{% endfor %}</div></div>
+{% endif %}
+
+<script>
+const IDX = {{ idx | tojson }};
+const CANDS = {{ cands | tojson }};
+if (document.getElementById('ch-idx') && IDX.length) {
+  WB.mkIdxTrend('ch-idx', {dates: IDX.map(r => r.date.slice(5)), close: IDX.map(r => r.close), amount: IDX.map(r => r.amount_yi)});
+}
+{% if stage %}WB.renderStageStrip('strip1', {{ stage | tojson }}, '当前阶段');{% endif %}
+document.getElementById('cands').innerHTML = (CANDS || []).map((c, i) => WB.candCard({
+  name: c.name, code: c.code, badge: c.grade || '', sector: c.sector || '',
+  horizon: '标准 1-2 周', five: Object.entries(JSON.parse(c.five_dim || '{}')),
+  score: (c.score || '—') + '/5',
+  metrics: Object.entries(JSON.parse(c.indicators || '{}')).map(([k, v]) => [k, v, '']),
+  action: c.action || ''
+}, 'ov-' + i)).join('');
+(CANDS || []).forEach((c, i) => {
+  const el = document.getElementById('ck-ov-' + i);
+});
+</script>
+{% endblock %}
