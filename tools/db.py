@@ -129,6 +129,14 @@ CREATE TABLE IF NOT EXISTS trade_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   date TEXT, code TEXT, name TEXT, side TEXT, price REAL, qty REAL, reason TEXT
 );
+CREATE TABLE IF NOT EXISTS author_picks (
+  date TEXT, code TEXT, name TEXT,
+  note TEXT,                          -- 作者理由/用户转述备注
+  entry_ref REAL,                     -- 参考介入价（如提供）
+  features TEXT,                      -- 入选日特征快照 JSON
+  fwd TEXT,                           -- 前向收益 JSON {t1_open,t1_high,t1,t3,t5,t10,...}
+  PRIMARY KEY(date, code)
+);
 CREATE TABLE IF NOT EXISTS macro (
   code TEXT, date TEXT, value REAL, PRIMARY KEY(code, date)
 );

@@ -43,6 +43,8 @@ TABLE_META = {
                 "db.py report-add（与 reports/ 存档原件同动作写入）", "每份报告"),
     "fund_nav": ("基金净值——场外 nav/acc_nav 与场内 close（预留）", "规划：hexin-fund 周更 / wind-fund 日频", "周/日"),
     "trade_events": ("真实买卖事件（P4 预留）——用于判断质量与实际盈亏归因", "规划：用户记账", "随交易"),
+    "author_picks": ("作者自选池（实证校准数据流）——入选日特征快照 + 前向收益 + 作者操作记录",
+                     "用户提供→会话结构化写入（快照落盘 author_picks_<D>.json）", "随作者名单（每交易日）"),
     "macro": ("宏观指标（远期预留）——wind EDB 社融/LPR 等", "规划：wind-economic", "月/周"),
 }
 
@@ -125,6 +127,13 @@ COLS = {
                 "refs": "引用的方法论条目", "md_path/html_path": "存档原件路径",
                 "created_at": "入库时间"},
     "schema_version": {"version": "结构版本号", "applied_at": "应用时间"},
+    "author_picks": {
+        "date": "入选日（作者名单日）", "code": "股票代码", "name": "名称",
+        "note": "备注（用户转述原文/名称核实依据/作者理由）",
+        "entry_ref": "参考介入价（如提供；NULL=未知）",
+        "features": "JSON 入选日特征快照（板块/收盘/振幅特征/近5日高点距离/换手/成交额/启动结构）",
+        "fwd": "JSON 前向收益与作者操作 {t1_open%/t1_high%/t1_close%/t1_冲高回落%/t3%/t5%/t10%/author_action}",
+    },
 }
 
 JSON_EXAMPLES = """
