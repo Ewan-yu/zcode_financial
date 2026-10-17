@@ -372,15 +372,20 @@ def cmd_pool(a):
                              " VALUES (?,?,?,?,?,?,?)", (d, a.pool, code, name, "remove", a.reason, today()))
             _out("pool remove %s: %d 只" % (a.pool, len(parse_codes(a.codes))))
         elif a.action == "move":
+            # 文档用法是 pool move <代码> --from ... --to ...：代码落在第一个位置参数上
+            code = a.code or (a.pool if a.pool and re.fullmatch(r"[0-9A-Za-z.\-]{5,12}", a.pool) else None)
+            if not code or not a.frm or not a.to:
+                _out("FAIL move 需要：pool move <代码> --from <源池> --to <目标池> [--name 名称]")
+                return 1
             _ensure_pool(conn, a.to, d)
-            conn.execute("UPDATE pool_members SET status='removed' WHERE pool=? AND code=?", (a.frm, a.code))
+            conn.execute("UPDATE pool_members SET status='removed' WHERE pool=? AND code=?", (a.frm, code))
             conn.execute("INSERT OR REPLACE INTO pool_members VALUES (?,?,?,?,?,?,?)",
-                         (a.to, a.code, a.name, d, "active", None, a.reason))
+                         (a.to, code, a.name or code, d, "active", None, a.reason))
             conn.execute("INSERT INTO pool_events (date,pool,code,name,event,reason,extra,created_at)"
                          " VALUES (?,?,?,?,?,?,?,?)",
-                         (d, a.to, a.code, a.name, "move", a.reason,
+                         (d, a.to, code, a.name or code, "move", a.reason,
                           jdump({"from": a.frm, "to": a.to}), today()))
-            _out("pool move %s: %s -> %s" % (a.code, a.frm, a.to))
+            _out("pool move %s: %s -> %s" % (code, a.frm, a.to))
         elif a.action == "list":
             for r in conn.execute("SELECT p.key,p.title,p.source,"
                                   "(SELECT COUNT(*) FROM pool_members m WHERE m.pool=p.key AND m.status='active') c"
@@ -546,7 +551,8 @@ def main(argv=None):
     p = sub.add_parser("pool")
     p.add_argument("action", choices=["add", "remove", "move", "list", "events"])
     p.add_argument("pool", nargs="?")
-    p.add_argument("--codes"); p.add_argument("--code"); p.add_argument("--name")
+    p.add_argument("code", nargs="?")  # move/remove 的标的代码（位置参数）
+    p.add_argument("--codes"); p.add_argument("--name")
     p.add_argument("--from", dest="frm"); p.add_argument("--to")
     p.add_argument("--reason", default=""); p.add_argument("--horizon")
     p.add_argument("--date")
