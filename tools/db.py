@@ -149,6 +149,8 @@ PRESET_POOLS = [
      "dt-review A级入池；status/horizon/days_watched 生命周期，标准票>10日无进展移出"),
     ("youzi", "柚子哥标的池", "DT", "youzi",
      "全部短线性质、依行情灵活进出（无长线池；同一票可视行情反复做）——实证校准数据流"),
+    ("long_watchlist", "长线股池", "VF/TR", "user",
+     "用户长线标的——后期价投分析（模块B基本面）与趋势跟踪（TR域）"),
     ("dt_rejected", "短线淘汰池", "DT", "system",
      "复盘剔除/门槛拦截/自选移出；前向跟踪检验假阴性"),
 ]
