@@ -5,17 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>看板 · {标题}</title>
 <!--
-  看板骨架 templates/dt/dashboard.html v1
-  · 所有场景通用框架：页头(标题+日期+基调徽章) → 结论卡组 → 图表区 → 数据表 → 数据出处页脚
-  · 颜色遵循 A 股惯例：涨=红 --up，跌=绿 --down
-  · 生成时：替换 {{...}} 占位与 DEMO 数据；删除用不到的图表卡片；用不到的 helper 可留可删
-  · 硬规则：正文（含注释）禁止出现知识条目编号（域-类-序号形式），规则用"名称+一句话"表达；
-    页脚必须保留"数据出处"块（每个数字的来源文件/工具）
-  · 各场景推荐图表：
-      复盘 review   ：情绪指标卡组 + 连板梯队条形图(barChart) + 候选五维评分表(renderTable)
-      单票 stock    ：分时价格+VWAP(mkIntraday) + 上/下行量堆叠(mkVolume) + 近60日收盘(mkLine) + 指标卡组
-      对比 sector   ：对比矩阵表(renderTable 着色) + 关键指标横向条形对比(barChart horizontal)
-      盘前 briefing ：昨日情绪卡组 + 观察清单表(renderTable)
+  看板骨架 templates/dt/dashboard.html v2（数据驱动渲染引擎）
+  用法一（复盘看板，推荐）：复制本文件，在 </body> 前注入一行真实数据
+    <script>const REAL_DATA = {...};</script>
+    页面检测到 REAL_DATA 即自动渲染六大模块（见 renderReview），无则为演示数据。
+  用法二（单票/对比/盘前看板）：用下方图表助手手动组槽位。
+  六模块（复盘）：市场温度 → 板块氛围 → 主线判定 → 推荐标的卡 → 自选滚动与持仓对策 → 昨日台账验证
+  设计纪律：
+  · 图表只为打法问题服务（温度在哪/板块在哪个环节/标的凭什么推荐/持仓怎么办），无数据的图不画
+  · 颜色遵循 A 股惯例：涨=红，跌=绿；环节色：冰点灰/启动蓝/发酵红/高潮黄/退潮绿
+  · 全文（含注释）禁止出现知识条目编号（域-类-序号形式），规则用"名称+一句话"表达
+  · 页脚必须保留"数据出处"块；缺数就少画一张图并在页脚注明
 -->
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <style>
@@ -28,44 +28,69 @@
 html,body{margin:0;padding:0}
 body{background:var(--bg);color:var(--text);
   font:14px/1.65 "Microsoft YaHei","PingFang SC","Segoe UI",system-ui,sans-serif}
-.wrap{max-width:1180px;margin:0 auto;padding:18px 20px 40px}
-/* 页头 */
+.wrap{max-width:1240px;margin:0 auto;padding:18px 20px 40px}
 header.bar{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
-  border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:16px}
+  border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:14px}
 header.bar h1{font-size:20px;margin:0;letter-spacing:.5px}
 header.bar .date{color:var(--muted);font-size:13px}
-.badge{font-size:13px;padding:2px 10px;border-radius:12px;border:1px solid var(--line);
-  background:var(--panel2)}
+.badge{font-size:13px;padding:2px 10px;border-radius:12px;border:1px solid var(--line);background:var(--panel2)}
 .badge.up{color:var(--up);border-color:rgba(229,72,77,.45)}
 .badge.down{color:var(--down);border-color:rgba(47,179,124,.45)}
 .badge.warn{color:var(--warn);border-color:rgba(226,179,65,.45)}
 .badge.cold{color:var(--accent);border-color:rgba(76,141,255,.45)}
+/* 区块 */
+.sec{margin-bottom:18px}
+.sec>h2{font-size:15px;margin:0 0 10px;color:var(--text);display:flex;align-items:center;gap:8px}
+.sec>h2::before{content:"";width:4px;height:16px;border-radius:2px;background:var(--accent)}
+.sec>h2 .sub{font-size:12px;color:var(--muted);font-weight:400}
 /* 结论卡组 */
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-bottom:16px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:10px;margin-bottom:10px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
 .card .k{color:var(--muted);font-size:12px;margin-bottom:4px}
 .card .v{font-size:17px;font-weight:600}
 .card .s{font-size:12px;color:var(--muted);margin-top:4px}
 .card .v.up{color:var(--up)} .card .v.down{color:var(--down)}
 .card .v.warn{color:var(--warn)} .card .v.cold{color:var(--accent)}
-/* 图表区 */
-.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:10px;margin-bottom:16px}
+/* 情绪周期位置条 */
+.strip{display:flex;gap:4px;margin:6px 0 10px}
+.strip .seg{flex:1;text-align:center;padding:7px 0 5px;border-radius:8px;background:var(--panel2);
+  border:1px solid var(--line);color:var(--muted);font-size:12px;position:relative}
+.strip .seg.on{color:#fff;font-weight:600;box-shadow:0 0 0 1px currentColor inset}
+.strip .seg .tip{display:block;font-size:11px;opacity:.75}
+/* 图表与表格容器 */
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:10px}
 .chart{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px 6px}
 .chart h3{margin:2px 0 6px;font-size:13px;color:var(--muted);font-weight:600}
-.chart .ec{width:100%;height:260px}
+.chart .ec{width:100%;height:250px}
 .span6{grid-column:span 6}.span12{grid-column:span 12}.span4{grid-column:span 4}.span8{grid-column:span 8}
-@media (max-width:760px){.span6,.span4,.span8{grid-column:span 12}}
-/* 数据表 */
+@media (max-width:780px){.span6,.span4,.span8{grid-column:span 12}}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{color:var(--muted);font-weight:600;text-align:left;border-bottom:1px solid var(--line);
   padding:6px 8px;white-space:nowrap}
 td{border-bottom:1px solid rgba(42,50,62,.55);padding:6px 8px;vertical-align:top}
 tr:last-child td{border-bottom:none}
-td.up,span.up{color:var(--up)} td.down,span.down{color:var(--down)} td.warn{color:var(--warn)}
+td.up,span.up{color:var(--up)} td.down,span.down{color:var(--down)} td.warn,span.warn{color:var(--warn)}
+td.cold,span.cold{color:var(--accent)}
 .tbl{background:var(--panel);border:1px solid var(--line);border-radius:10px;
-  padding:10px 12px;margin-bottom:16px;overflow-x:auto}
+  padding:10px 12px;overflow-x:auto}
 .tbl h3{margin:2px 0 8px;font-size:13px;color:var(--muted);font-weight:600}
-/* 页脚出处 */
+/* 推荐标的卡 */
+.cands{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:10px}
+.cand{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.cand-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.cand-h b{font-size:16px}
+.cand-h .cd{color:var(--muted);font-size:12px;margin-left:6px}
+.cand-sub{color:var(--muted);font-size:12px;margin:2px 0 8px}
+.dots{font-size:12px;margin-bottom:8px}
+.dots span{margin-right:10px}
+.cand .ec{height:150px;margin:4px 0 6px}
+.act{font-size:12.5px;border-top:1px dashed var(--line);padding-top:8px;margin-top:4px}
+.act b{color:var(--warn)}
+/* 结论条 */
+.note{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);
+  border-radius:8px;padding:10px 14px;font-size:13.5px;margin-bottom:10px}
+.note.warn{border-left-color:var(--warn)}
+.note.down{border-left-color:var(--down)}
 footer{border-top:1px solid var(--line);padding-top:10px;color:var(--muted);font-size:12px}
 footer b{color:var(--text)}
 .demo-tip{background:rgba(226,179,65,.12);border:1px solid rgba(226,179,65,.4);color:var(--warn);
@@ -74,136 +99,230 @@ footer b{color:var(--text)}
 </head>
 <body>
 <div class="wrap">
-
-  <div class="demo-tip" id="demoTip" hidden>当前为骨架演示数据——生成看板时必须整体替换，并删除本提示。</div>
-
+  <div class="demo-tip" id="demoTip" hidden>当前为骨架演示数据——正式看板必须注入真实落盘数据并删除本提示。</div>
   <header class="bar">
-    <h1>{{标题：如 2026-10-19 晚间复盘 / 均胜电子短线分析}}</h1>
-    <span class="date">{{日期}} · 数据截至 {{时点}}</span>
-    <span class="badge {{tone}}">{{基调徽章：如 深冬·空仓观察}}</span>
+    <h1 id="h-title">看板标题</h1>
+    <span class="date" id="h-date"></span>
+    <span class="badge" id="h-badge"></span>
   </header>
-
-  <!-- SLOT cards：结论卡组（每张：标签/主值/副注；tone: up/down/warn/cold） -->
-  <section class="cards" id="slot-cards"></section>
-
-  <!-- SLOT charts：图表区（按需增删 .chart；span* 控宽） -->
-  <section class="grid" id="slot-charts">
-    <div class="chart span6"><h3>{{图1标题：如 分时价格与均价线}}</h3><div class="ec" id="chart-1"></div></div>
-    <div class="chart span6"><h3>{{图2标题：如 上行/下行量分解}}</h3><div class="ec" id="chart-2"></div></div>
-    <div class="chart span12"><h3>{{图3标题：如 连板梯队}}</h3><div class="ec" id="chart-3"></div></div>
-  </section>
-
-  <!-- SLOT table：数据表（候选评分/自选复检/对比矩阵/观察清单） -->
-  <section class="tbl"><h3>{{表标题}}</h3><div id="slot-table"></div></section>
-
+  <div id="app"></div>
   <footer id="provenance">
-    <b>数据出处</b>（看板中每个数字的来源）：{{逐条列出 数据 → 工具 → 落盘文件/当次返回}}
-    <br>生成：{{技能名}} · 模板 templates/dt/dashboard.html v1
+    <b>数据出处</b>（看板中每个数字的来源）：<span id="prov-body">未填写</span>
+    <br>生成：{技能名} · 模板 templates/dt/dashboard.html v2
   </footer>
 </div>
 
 <script>
-/* ================= 基础配置 ================= */
+/* ================= 基础 ================= */
 const UP='#e5484d', DOWN='#2fb37c', WARN='#e2b341', ACCENT='#4c8dff',
       MUTED='#8b95a5', LINE='#2a323e', TEXT='#d8dee8';
+const STAGE_COLOR={'冰点':MUTED,'启动':ACCENT,'发酵':UP,'高潮':WARN,'退潮':DOWN};
 const FONT={fontFamily:'Microsoft YaHei,PingFang SC,sans-serif',fontSize:11,color:MUTED};
 const AXIS={axisLine:{lineStyle:{color:LINE}},axisLabel:FONT,splitLine:{lineStyle:{color:'rgba(42,50,62,.5)'}}};
-const grid={left:56,right:18,top:30,bottom:26};
+const grid={left:56,right:20,top:32,bottom:26};
 const tooltip={trigger:'axis',backgroundColor:'#1b222c',borderColor:LINE,textStyle:{color:TEXT,fontSize:12}};
 
-function toneClass(w){ /* 基调词→徽章色：跌/退/低迷/冬→down冷, 涨/发酵/暖→up, 谨慎→warn */
-  if(/退潮|低迷|深冬|跌|冰点/.test(w))return 'down';
-  if(/发酵|回暖|偏暖|涨|高潮/.test(w))return 'up';
-  if(/谨慎|降温|预警/.test(w))return 'warn';
+function toneClass(w){
+  if(/退潮|低迷|深冬|冰点|跌|拦截|回避/.test(w))return 'down';
+  if(/发酵|回暖|偏暖|涨|高潮|入池/.test(w))return 'up';
+  if(/谨慎|降温|预警|备查|观察/.test(w))return 'warn';
   return 'cold';
 }
-function card(k,v,s,tone){return `<div class="card"><div class="k">${k}</div>
-  <div class="v ${tone||''}">${v}</div><div class="s">${s||''}</div></div>`;}
-function setCards(html){document.getElementById('slot-cards').innerHTML=html;}
+function gradeClass(g){return g==='优'?'up':(g==='中'?'warn':'down');}
+function esc(s){return String(s==null?'—':s);}
+function card(k,v,s,tone){return `<div class="card"><div class="k">${esc(k)}</div>
+  <div class="v ${tone||''}">${esc(v)}</div><div class="s">${esc(s||'')}</div></div>`;}
 function chart(el){return echarts.init(document.getElementById(el),null,{renderer:'canvas'});}
+function h(tag,cls,html){return `<${tag} class="${cls||''}">${html||''}</${tag}>`;}
+function sec(title,sub,inner){return `<section class="sec"><h2>${title}
+  <span class="sub">${sub||''}</span></h2>${inner}</section>`;}
+function tbl(cols,rows){return `<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead>
+  <tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;}
+function ma(arr,n){const out=[];let s=0;for(let i=0;i<arr.length;i++){s+=arr[i];
+  if(i>=n)s-=arr[i-n];out.push(i>=n-1?+(s/n).toFixed(2):null);}return out;}
 
 /* ================= 图表助手 ================= */
-/* 分时：价格线 + VWAP线 + 昨收虚线（单票场景） */
 function mkIntraday(id,{times,price,vwap,prevClose}){
   chart(id).setOption({backgroundColor:'transparent',tooltip,grid,
-    xAxis:{type:'category',data:times,...AXIS},
-    yAxis:{scale:true,...AXIS},
-    series:[
-      {name:'价格',type:'line',data:price,showSymbol:false,lineStyle:{color:ACCENT,width:1.4}},
+    xAxis:{type:'category',data:times,...AXIS},yAxis:{scale:true,...AXIS},
+    series:[{name:'价格',type:'line',data:price,showSymbol:false,lineStyle:{color:ACCENT,width:1.4}},
       {name:'均价线',type:'line',data:vwap,showSymbol:false,lineStyle:{color:WARN,width:1.2}},
       ...(prevClose?[{name:'昨收',type:'line',data:times.map(()=>prevClose),showSymbol:false,
-        lineStyle:{type:'dashed',color:MUTED,width:1}}]:[])
-    ]});
+        lineStyle:{type:'dashed',color:MUTED,width:1}}]:[])]});
 }
-/* 上行/下行量堆叠：红=上行量 绿=下行量（单票承接） */
 function mkVolume(id,{times,up,down}){
-  chart(id).setOption({backgroundColor:'transparent',tooltip,grid,
-    legend:{textStyle:FONT,top:0},
-    xAxis:{type:'category',data:times,...AXIS},
-    yAxis:{...AXIS},
-    series:[
-      {name:'上行量(万手/万元)',type:'bar',stack:'v',data:up,itemStyle:{color:UP}},
-      {name:'下行量',type:'bar',stack:'v',data:down,itemStyle:{color:DOWN}}
-    ]});
+  chart(id).setOption({backgroundColor:'transparent',tooltip,grid,legend:{textStyle:FONT,top:0},
+    xAxis:{type:'category',data:times,...AXIS},yAxis:{...AXIS},
+    series:[{name:'上行量',type:'bar',stack:'v',data:up,itemStyle:{color:UP}},
+      {name:'下行量',type:'bar',stack:'v',data:down,itemStyle:{color:DOWN}}]});
 }
-/* 通用折线/面积（日K收盘、序列趋势） */
 function mkLine(id,{times,series,area}){
   chart(id).setOption({backgroundColor:'transparent',tooltip,grid,
     legend:series.length>1?{textStyle:FONT,top:0}:undefined,
-    xAxis:{type:'category',data:times,...AXIS},
-    yAxis:{scale:true,...AXIS},
-    series:series.map(s=>({name:s.name,type:'line',data:s.data,showSymbol:false,
+    xAxis:{type:'category',data:times,...AXIS},yAxis:{scale:true,...AXIS},
+    series:series.map(s=>({name:s.name,type:'line',data:s.data,showSymbol:false,connectNulls:true,
       lineStyle:{color:s.color||ACCENT,width:1.4},
-      areaStyle:area?{color:{type:'linear',x:0,y:0,x2:0,y2:1,
-        colorStops:[{offset:0,color:(s.color||ACCENT)+'33'},{offset:1,color:'transparent'}]}}:undefined}))});
+      areaStyle:area?{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[
+        {offset:0,color:(s.color||ACCENT)+'30'},{offset:1,color:'transparent'}]}}:undefined}))});
 }
-/* 通用条形（连板梯队/指标对比；horizontal=true 横向） */
-function mkBar(id,{cats,values,colors,unit}){
-  const horizontal=!!(colors&&colors.h);
+function mkBar(id,{cats,values,colors,unit,horizontal}){
   chart(id).setOption({backgroundColor:'transparent',
     tooltip:{trigger:'item',backgroundColor:'#1b222c',borderColor:LINE,
       textStyle:{color:TEXT,fontSize:12},formatter:p=>`${p.name}：${p.value}${unit||''}`},
-    grid:horizontal?{left:90,right:30,top:10,bottom:26}:grid,
+    grid:horizontal?{left:110,right:44,top:8,bottom:26}:grid,
     xAxis:{type:horizontal?'value':'category',data:horizontal?undefined:cats,...AXIS},
     yAxis:{type:horizontal?'category':'value',data:horizontal?cats:undefined,...AXIS},
-    series:[{type:'bar',data:(values||[]).map((v,i)=>({
-        value:v,itemStyle:{color:(Array.isArray(colors)?colors[i]:colors)||ACCENT}})),
-      barMaxWidth:26,label:{show:true,position:horizontal?'right':'top',...FONT,color:TEXT}}]});
+    series:[{type:'bar',data:(values||[]).map((v,i)=>({value:v,
+      itemStyle:{color:(Array.isArray(colors)?colors[i]:colors)||ACCENT}})),
+      barMaxWidth:24,label:{show:true,position:horizontal?'right':'top',...FONT,color:TEXT}}]});
 }
-/* 数据表：columns=[...], rows=[[...]]；单元格内容原样输出（可带 <span class="up">） */
-function renderTable(id,{columns,rows}){
-  document.getElementById(id).innerHTML=
-    `<table><thead><tr>${columns.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>`+
-    rows.map(r=>`<tr>${r.map(c=>`<td>${c==null?'—':c}</td>`).join('')}</tr>`).join('')+`</tbody></table>`;
+function mkIdxTrend(id,{dates,close,amount}){
+  chart(id).setOption({backgroundColor:'transparent',tooltip,legend:{textStyle:FONT,top:0},
+    grid:[{left:56,right:56,top:30,bottom:26}],
+    xAxis:{type:'category',data:dates,...AXIS},
+    yAxis:[{scale:true,name:'点位',nameTextStyle:FONT,...AXIS},
+           {scale:true,name:'成交额(亿)',nameTextStyle:FONT,splitLine:{show:false},...AXIS}],
+    series:[{name:'收盘',type:'line',data:close,showSymbol:false,
+              lineStyle:{color:ACCENT,width:1.5}},
+            {name:'20日线',type:'line',data:ma(close,20),showSymbol:false,connectNulls:true,
+              lineStyle:{color:WARN,width:1.2}},
+            {name:'成交额',type:'bar',yAxisIndex:1,data:amount,
+              itemStyle:{color:'rgba(139,149,165,.35)'}}]});
+}
+function mkCandle(id,{dates,ohlc,ma5,ma20}){
+  chart(id).setOption({backgroundColor:'transparent',tooltip,
+    grid:{left:50,right:12,top:20,bottom:22},
+    xAxis:{type:'category',data:dates,...AXIS,axisLabel:{...FONT,formatter:v=>v.slice(5)}},
+    yAxis:{scale:true,...AXIS,splitLine:{show:false}},
+    series:[{type:'candlestick',data:ohlc,
+      itemStyle:{color:UP,color0:DOWN,borderColor:UP,borderColor0:DOWN}},
+      ...(ma5?[{name:'5日线',type:'line',data:ma5,showSymbol:false,connectNulls:true,
+        lineStyle:{color:WARN,width:1}}]:[]),
+      ...(ma20?[{name:'20日线',type:'line',data:ma20,showSymbol:false,connectNulls:true,
+        lineStyle:{color:ACCENT,width:1}}]:[])]});
+}
+function renderStageStrip(container,cur,tip){
+  const stages=['冰点','启动','发酵','高潮','退潮'];
+  document.getElementById(container).innerHTML=`<div class="strip">`+stages.map(s=>{
+    const c=STAGE_COLOR[s]||MUTED;
+    return `<div class="seg ${s===cur?'on':''}" style="${s===cur?`color:${c};border-color:${c}`:''}">
+      ${s}${s===cur?`<span class="tip">${esc(tip||'当前位置')}</span>`:''}</div>`;}).join('')+`</div>`;
+}
+function candCard(o,idx){
+  const five=(o.five||[]).map(([k,g])=>`<span class="${gradeClass(g)}">${k} ${g}</span>`).join('');
+  const mets=(o.metrics||[]).map(([k,v,t])=>`<tr><td style="color:var(--muted)">${esc(k)}</td>
+    <td class="${t||''}" style="text-align:right">${esc(v)}</td></tr>`).join('');
+  return `<div class="cand">
+    <div class="cand-h"><div><b>${esc(o.name)}</b><span class="cd">${esc(o.code)}</span></div>
+      <span class="badge ${toneClass(o.badge)}">${esc(o.badge)}</span></div>
+    <div class="cand-sub">${esc(o.sector)} · 周期档：${esc(o.horizon||'标准 1-2 周')}</div>
+    <div class="dots">${five}${o.score?`<span>→ <b>${esc(o.score)}</b></span>`:''}</div>
+    <table style="margin-bottom:6px">${mets}</table>
+    ${o.k?`<div class="ec" id="ck-${idx}"></div>`:''}
+    <div class="act"><b>对策：</b>${esc(o.action)}</div>
+    ${o.note?`<div class="act" style="border:none;padding-top:4px;color:var(--muted)">${esc(o.note)}</div>`:''}
+  </div>`;
 }
 
-/* ================= DEMO 数据（生成时整体替换并删除本段与 demoTip 显示） ================= */
-const IS_DEMO=true;
-if(IS_DEMO){document.getElementById('demoTip').hidden=false;}
-(function demo(){
-  if(!IS_DEMO)return;
-  const times=['09:35','09:40','09:45','10:00','10:40','11:00','13:30','14:00','14:40','15:00'];
-  setCards([
-    card('综合基调','深冬 · 空仓观察','大盘环境低迷 × 博弈层退潮','down'),
-    card('上证指数','3716.28','+0.24%（护盘性红盘，趋势仍弱）','warn'),
-    card('两市成交额','15554 亿','较昨日缩量','warn'),
-    card('连板晋级率','15.8%','6/38，高位断板多','down')
-  ].join(''));
-  const t=[];for(let i=0;i<48;i++)t.push(i<24?('09:3'+(i%10)):(i<36?('10:'+(i-24+10)):('11:'+(i-36))));
-  const price=[],vwap=[];let p=18.6,v=18.6;
-  for(let i=0;i<48;i++){p+=(Math.sin(i/6)+Math.random()-.5)*.06;v+=(p-v)*.08;price.push(+p.toFixed(2));vwap.push(+v.toFixed(2));}
-  mkIntraday('chart-1',{times:t,price,vwap,prevClose:18.5});
-  mkVolume('chart-2',{times:t.slice(0,20),
-    up:t.slice(0,20).map((_,i)=>+(800+400*Math.abs(Math.sin(i))).toFixed(0)),
-    down:t.slice(0,20).map((_,i)=>+(300+300*Math.abs(Math.cos(i))).toFixed(0))});
-  mkBar('chart-3',{cats:['2板','3板','4板','5板+'],values:[18,5,2,1],
-    colors:[DOWN,WARN,WARN,UP]});
-  renderTable('slot-table',{columns:['标的','板块(环节)','总分/5','建议'],
-    rows:[['示例A','传媒(退潮)','4/5','<span class="down">不入池·仅记录</span>'],
-          ['示例B','低空经济(发酵)','3/5','<span class="warn">B级·备选</span>']]});
-})();
-/* 生成看板时的取数纪律：所有图表数据来自本次落盘文件（data/snapshots/<D>/…），
-   禁止手敲凭印象的数字；缺数就少画一张图并在页脚注明。 */
+/* ================= 复盘看板渲染引擎（注入 REAL_DATA 即用） ================= */
+function renderReview(D){
+  document.getElementById('h-title').textContent=D.meta.title;
+  document.getElementById('h-date').textContent=D.meta.date+(D.meta.asof?(' · 数据截至 '+D.meta.asof):'');
+  const bd=document.getElementById('h-badge');bd.textContent=D.meta.tone.text;bd.className='badge '+toneClass(D.meta.tone.text);
+  document.getElementById('prov-body').innerHTML=(D.provenance||[]).map(p=>`${esc(p[0])}←${esc(p[1])}`).join('；');
+  const app=document.getElementById('app');let html='';let chartJobs=[];
+
+  /* ① 市场温度 */
+  const T=D.temp;
+  html+=sec('市场温度','环境层 × 博弈层 → 组合基调',
+    `<div class="cards">${T.cards.map(c=>card(...c)).join('')}</div>
+     <div id="strip-1"></div>
+     <div class="note ${toneClass(D.meta.tone.text)}">${esc(T.combo.text)}<br>
+       <span style="color:var(--muted)">${esc(T.combo.meaning)}</span></div>
+     <div class="grid">
+       <div class="chart span8"><h3>上证指数近 3 个月（收盘 / 20日线 / 成交额）</h3><div class="ec" id="ch-idx"></div></div>
+       <div class="tbl span4"><h3>博弈层六指标</h3>${tbl(['指标','数值','口径'],T.l2table)}</div>
+     </div>`);
+  chartJobs.push(()=>{renderStageStrip('strip-1',T.stageStrip.current,T.stageStrip.tip);
+    mkIdxTrend('ch-idx',T.idx);});
+
+  /* ② 板块氛围 */
+  const S=D.sectors;
+  html+=sec('板块氛围','涨停家数 × 环节着色（蓝=启动 红=发酵 黄=高潮 绿=退潮）',
+    `<div class="grid">
+       <div class="chart span5"><h3>板块涨停家数（按环节着色）</h3><div class="ec" id="ch-sec"></div></div>
+       <div class="tbl span7"><h3>板块地图</h3>${tbl(['板块','家数','梯队/龙头','催化','环节','分级'],S.table)}</div>
+     </div>`);
+  chartJobs.push(()=>mkBar('ch-sec',{cats:S.bars.names,values:S.bars.values,
+    colors:S.bars.colors,unit:' 家',horizontal:true}));
+
+  /* ③ 主线判定 */
+  const M=D.mainline;
+  html+=sec('主线判定','入池门槛四条件（板块是选股的主语）',
+    `<div class="tbl" style="margin-bottom:10px">${tbl(['门槛条件','数据/证据','通过?'],M.gate)}</div>
+     <div class="note ${toneClass(M.conclusion)}">${esc(M.conclusion)}<br>
+       <span style="color:var(--muted)">${esc(M.leaders||'')}</span></div>`);
+
+  /* ④ 推荐标的 */
+  const cardsHtml=(D.cands||[]).map((c,i)=>candCard(c,i)).join('')||
+    '<div class="note down">本日无推荐标的（原因见结论卡）</div>';
+  html+=sec('推荐标的','每张卡：五维 + 指标参考组数值 + 迷你K线 + 对策',
+    (D.candNote?`<div class="note warn">${esc(D.candNote)}</div>`:'')+`<div class="cands">${cardsHtml}</div>`);
+  (D.cands||[]).forEach((c,i)=>{if(c.k)chartJobs.push(()=>mkCandle('ck-'+i,c.k));});
+
+  /* ⑤ 自选滚动与持仓对策 */
+  const W=D.watch;
+  html+=sec('自选滚动与持仓对策','标准票>10日无进展移出；主线票放宽20日；板块退潮即移出',
+    `<div class="note">${esc(W.roll)}</div>
+     <div class="tbl" style="margin-bottom:10px"><h3>存量复查</h3>${tbl(W.cols,W.rows)}</div>
+     <div class="tbl"><h3>持仓对策（分档）</h3>${tbl(['持仓','档','明日对策（条件化）'],W.holding)}</div>`);
+
+  /* ⑥ 昨日台账验证 */
+  const L=D.ledger;
+  html+=sec('昨日预判验证','台账对账——判涨实涨/判涨实跌/判跌实涨（认错）/判跌实跌',
+    `<div class="tbl">${tbl(['登记日','标的','方向','判断摘要','验证日','状态'],L.rows)}</div>`);
+
+  app.innerHTML=html;
+  chartJobs.forEach(f=>f());
+}
+
+/* ================= 数据入口 ================= */
+const REAL=window.REAL_DATA||null;
+if(REAL){renderReview(REAL);}
+else{
+  document.getElementById('demoTip').hidden=false;
+  renderReview(DEMO());
+}
+function DEMO(){/* 演示数据：结构与真实数据完全一致，仅供预览样式 */
+  const d=[];const c=[];const a=[];let p=3716;
+  for(let i=0;i<63;i++){p+=(Math.sin(i/9)+Math.random()-.55)*22;c.push(+p.toFixed(2));
+    a.push(+(7000+3000*Math.random()).toFixed(0));
+    d.push('2026-'+String(8+(i>30?1:0)).padStart(2,'0')+'-'+String(1+i%28).padStart(2,'0'));}
+  return {meta:{title:'演示 · 晚间复盘',date:'样式预览',asof:'',tone:{text:'退潮 · 谨慎'}},
+    temp:{cards:[['组合基调','结构市','降档只做主线','warn'],['涨停家数','61','非ST',''],
+      ['晋级率','15.8%','6/38','down'],['两市成交额','15554 亿','缩量','warn']],
+      combo:{text:'演示：低迷 × 退潮 = 深冬',meaning:'空仓观察，等新周期萌芽'},
+      stageStrip:{current:'退潮',tip:'高度11板但晋级率15.8%'},
+      l2table:[['涨停家数','61','非ST'],['跌停家数','10','非ST']],
+      idx:{dates:d,close:c,amount:a}},
+    sectors:{bars:{names:['板块A','板块B','板块C'],values:[14,7,5],
+        colors:[STAGE_COLOR['发酵'],STAGE_COLOR['启动'],STAGE_COLOR['高潮']]},
+      table:[['板块A',14,'首板为主','演示催化','发酵','产业级']]},
+    mainline:{gate:[['持续性逻辑','产业级 ✓','✓'],['梯队','首板为主 ✗','✗']],
+      conclusion:'演示：板块资格通过但被环境压制',leaders:'空间龙头缺失'},
+    candNote:'演示提示：本日无入池标的',
+    cands:[{name:'演示票',code:'000000.TEST',badge:'拦截记录',sector:'板块A(发酵)',
+      five:[['启动结构','优'],['量能节奏','优'],['位置边际','优'],['回调质量','优'],['当日确认','优']],
+      score:'4.5/5',metrics:[['换手率','3.06%（缩量）',''],['龙虎榜','+0.76亿 第8位','up']],
+      action:'板块高潮段，不入池仅记录',
+      k:{dates:d.slice(-40),ohlc:c.slice(-40).map(v=>[v,v-0.2,v-0.5,v+0.3]),
+         ma5:ma(c,5).slice(-40),ma20:ma(c,20).slice(-40)}}],
+    watch:{roll:'演示：自选池示例数据未替换，滚动跟踪未启用',
+      cols:['标的','状态','今日'],rows:[['示例','观察中','—']],
+      holding:[['无持仓','—','—']]},
+    ledger:{rows:[['演示','MARKET','中性偏空','摘要','待验证','⏳']]},
+    provenance:[['演示数据','样式预览']]};
+}
 </script>
 </body>
 </html>

@@ -2,10 +2,11 @@
   "_说明": "统一自选池（观察池）。复制为 watchlist.json 后使用。核心是生命周期管理：复盘筛选出的 A/B 级候选自动/手动加入（status=观察中），每日复盘逐票复查，按 invalid_if 或观察超期移出（移入 archived 留痕）。持仓是自选池的子集（status=持仓，另在 positions.md 记账）。",
   "_字段说明": {
     "status": "观察中 | 重点 | 持仓 | 已结束",
+    "horizon": "标准(1-2周，默认) | 主线(≤1月，所属板块为启动/发酵期主线时用)",
     "add_reason": "加入原因（复盘定级依据 / 用户指定，引用方法论条目）",
     "observe_points": "观察要点（每日复查盯着什么看）",
     "invalid_if": "移出条件（预期兑现、失效或观察超期）",
-    "days_watched": "观察交易日数（复盘自动累计，>10 日无进展提示清理）"
+    "days_watched": "观察交易日数（标准票>10日无进展清理；horizon=主线 放宽至20日；所属板块退潮即移出，龙头风向标除外）"
   },
   "updated_at": "",
   "items": [
@@ -15,6 +16,7 @@
       "asset_type": "stock",
       "style": ["趋势", "波段"],
       "status": "观察中",
+      "horizon": "标准",
       "added": "",
       "add_reason": "示例：替换为真实自选",
       "observe_points": "",
@@ -29,6 +31,7 @@
       "asset_type": "etf",
       "style": ["底仓", "网格"],
       "status": "观察中",
+      "horizon": "标准",
       "added": "",
       "add_reason": "示例：场内ETF，纳入每日复查",
       "observe_points": "",
@@ -43,6 +46,7 @@
       "asset_type": "of_fund",
       "style": ["长线定投"],
       "status": "观察中",
+      "horizon": "标准",
       "track_freq": "weekly",
       "added": "",
       "add_reason": "示例：场外基金，周度跟踪净值与持仓风格",
