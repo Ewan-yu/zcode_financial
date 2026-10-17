@@ -25,6 +25,20 @@ def load_bars(path: str | Path) -> list[dict]:
     return bars
 
 
+def bars_from_wind_kline(rows: list[dict]) -> list[dict]:
+    """万得 get_stock_kline 返回行 → bars 格式。
+    列名映射：TIME(2026-10-16T10:35:00…取时分)/OPEN/HIGH/LOW/MATCH(收盘)/VOLUME(股)/TURNOVER(额)。
+    bar 标注为结束时刻（9:35 根 = 9:30-9:35）。"""
+    out = []
+    for r in rows:
+        t = str(r["TIME"])
+        hhmm = t[11:16] if len(t) > 11 else t
+        out.append({"time": hhmm, "open": float(r["OPEN"]), "high": float(r["HIGH"]),
+                    "low": float(r["LOW"]), "close": float(r["MATCH"]),
+                    "volume": float(r["VOLUME"]), "amount": float(r["TURNOVER"])})
+    return out
+
+
 def _num(v) -> float | None:
     """None/空串安全转 float（一字板零成交日的 volume/amount 常为 null）。"""
     if v is None or v == "":

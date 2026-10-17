@@ -11,6 +11,13 @@ description: 短线盘中盯盘与单票快诊（模块A）。当用户在盘中
 
 ## 模式一：单票快诊（用户点名某股）
 
+> **执行纪律（2026-10-17 用户稽核后确立）**：分时承接力指标必须**实际运行
+> `tools/indicators.py` 计算产出数值**，禁止仅凭读分钟图叙事下结论——读图只做形态
+> 归类的辅助。数据流固定为：万得 `get_stock_kline`（分钟K，含 AVPRICE 可交叉校验）→
+> `bars_from_wind_kline()` 转 bars → 指标函数（vwap/bias/updown_volume/pulse_events/
+> volume_ratio_at）→ 数值进入输出。当日与基准日分钟K落盘 `data/snapshots/<D>/<code>_min5_*.json`。
+> **指标数值与读图印象冲突时，以指标为准并重新归类形态。**
+
 1. **取数**（并行）：
    - `stock_highfreq_quotes` real_time：`最新价,涨跌幅,成交量,成交额,换手率,开盘价,最高价,最低价`
    - `stock_highfreq_quotes` highfreq 1 分钟K：`开盘价,最高价,最低价,收盘价,成交量,成交额`，
