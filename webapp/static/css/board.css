@@ -93,3 +93,20 @@ textarea{min-height:110px;resize:vertical}
 .tl .t{color:var(--muted);font-size:12px;margin-right:8px}
 .tag{display:inline-block;font-size:11px;color:var(--muted);border:1px solid var(--line);
   border-radius:6px;padding:0 6px;margin-right:6px}
+/* 下一交易日操作指导卡 */
+.opcard{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--warn);
+  border-radius:10px;padding:12px 16px 10px}
+.opcard.dir-up{border-left-color:var(--up)}
+.opcard.dir-down{border-left-color:var(--down)}
+.op-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.op-h .t{font-size:15px;font-weight:600}
+.op-h .cd{color:var(--muted);font-size:11px;font-weight:400;margin-left:4px}
+.op-h .meta{font-size:11px;color:var(--muted);white-space:nowrap}
+.op-body{font-size:12.8px;line-height:1.7;margin:9px 0 7px;padding:8px 12px;
+  background:rgba(42,50,62,.28);border-radius:8px}
+.op-row{display:flex;gap:9px;align-items:flex-start;font-size:12.3px;line-height:1.65;margin-top:6px}
+.op-row .lab{flex:none;font-size:11px;line-height:1.5;padding:1px 8px;border-radius:6px;
+  border:1px solid;white-space:nowrap;margin-top:2px}
+.op-row.trig .lab{color:var(--up);border-color:rgba(229,72,77,.42);background:rgba(229,72,77,.07)}
+.op-row.inval .lab{color:var(--down);border-color:rgba(47,179,124,.42);background:rgba(47,179,124,.07)}
+.op-row .txt{color:var(--muted);word-break:break-all;min-width:0}

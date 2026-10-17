@@ -32,17 +32,17 @@
 <div class="cands" id="cands"></div></div>
 
 <div class="sec"><h2>下一交易日操作指导 <span class="sub">待验证台账——判断全文与触发/失效条件（收盘后对照执行）</span></h2>
-<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(390px,1fr))">
+<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(440px,1fr))">
 {% for p in pending %}
-<div class="card" style="padding:10px 14px">
-  <div class="k" style="display:flex;justify-content:space-between;align-items:baseline">
-    <span><b style="color:var(--text);font-size:14px">{% if p.code != 'MARKET' %}<a href="{{ url_for('stock', code=p.code) }}">{{ p.name }}</a> <span style="font-size:11px">{{ p.code }}</span>{% else %}{{ p.name }}{% endif %}</b>
+<div class="opcard {{ 'dir-up' if '多' in (p.direction or '') else 'dir-down' if '空' in (p.direction or '') else '' }}">
+  <div class="op-h">
+    <span class="t">{% if p.code != 'MARKET' %}<a href="{{ url_for('stock', code=p.code) }}">{{ p.name }}</a><span class="cd">{{ p.code }}</span>{% else %}{{ p.name }}{% endif %}
       <span class="badge {{ 'up' if '多' in (p.direction or '') else 'down' if '空' in (p.direction or '') else 'warn' }}" style="margin-left:6px">{{ p.direction }}</span></span>
-    <span style="font-size:11px">登记 {{ p.reg_date }} · 验证 {{ p.verify_date or p.timeframe or '—' }}</span>
+    <span class="meta">登记 {{ p.reg_date }}　验证 {{ p.verify_date or p.timeframe or '—' }}</span>
   </div>
-  <div style="font-size:12.5px;margin:7px 0;line-height:1.65;color:var(--text)">{{ p.content }}</div>
-  {% if p.trigger_cond %}<div class="s" style="margin-top:5px"><span class="up">▲ 介入/触发</span>　{{ p.trigger_cond }}</div>{% endif %}
-  {% if p.invalid_cond %}<div class="s" style="margin-top:3px"><span class="down">▼ 失效/止损</span>　{{ p.invalid_cond }}</div>{% endif %}
+  <div class="op-body">{{ p.content }}</div>
+  {% if p.trigger_cond %}<div class="op-row trig"><span class="lab">▲ 介入/触发</span><span class="txt">{{ p.trigger_cond }}</span></div>{% endif %}
+  {% if p.invalid_cond %}<div class="op-row inval"><span class="lab">▼ 失效/止损</span><span class="txt">{{ p.invalid_cond }}</span></div>{% endif %}
 </div>
 {% else %}<div class="note">当前无待验证判断。</div>{% endfor %}
 </div></div>
