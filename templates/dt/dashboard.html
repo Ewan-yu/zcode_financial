@@ -296,9 +296,63 @@ function renderReview(D){
     window.__rsT=setTimeout(()=>{chartJobs.forEach(f=>{try{f();}catch(e){}});},200);});
 }
 
+/* ================= 个股看板渲染（REAL_DATA.meta.type==='stock' 时走此引擎） ================= */
+function renderStock(S){
+  document.getElementById('h-title').textContent=S.meta.title;
+  document.getElementById('h-date').textContent=S.meta.date+(S.meta.asof?(' · 数据截至 '+S.meta.asof):'');
+  const bd=document.getElementById('h-badge');bd.textContent=S.meta.tone.text;bd.className='badge '+toneClass(S.meta.tone.text);
+  document.getElementById('prov-body').innerHTML=(S.provenance||[]).map(p=>`${esc(p[0])}←${esc(p[1])}`).join('；');
+  const app=document.getElementById('app');let html='';const jobs=[];
+
+  /* ① 结论 */
+  html+=sec('结论','评级 · 现价 · 资金 · 环境',
+    `<div class="cards">${S.verdict.cards.map(c=>card(...c)).join('')}</div>
+     <div class="note">${esc(S.verdict.oneLiner)}</div>
+     <div class="note warn"><b>对策：</b>${esc(S.verdict.action)}</div>`);
+
+  /* ② 前次判断对账 */
+  html+=sec('前次判断对账','同票再次分析必含本节——台账逐条对照，禁止跳过',
+    `<div class="tbl" style="margin-bottom:8px">${tbl(S.recon.cols,S.recon.rows)}</div>
+     <div class="note">${esc(S.recon.note)}</div>`);
+
+  /* ③ 分时承接力 */
+  html+=sec('分时承接力','指标实测值（均价线/乖离/上行量/量比/脉冲），图表与读数同源、禁止读图替代',
+    `<div class="grid">
+       <div class="chart span6"><h3>分时价格与均价线（虚线=昨收）</h3><div class="ec" id="st-ip"></div></div>
+       <div class="chart span6"><h3>上行/下行量分解（万元/5分钟）</h3><div class="ec" id="st-uv"></div></div>
+     </div>
+     <div class="grid" style="margin-top:10px">
+       <div class="tbl span6"><h3>指标读数</h3>${tbl(['指标','数值','判读'],S.intraday.metrics)}</div>
+       <div class="tbl span6"><h3>脉冲回撤测试</h3>${tbl(['时间','成交额','5根内回落','判定'],S.intraday.pulses)}</div>
+     </div>`);
+  jobs.push(()=>{mkIntraday('st-ip',S.intraday.line);mkVolume('st-uv',S.intraday.uv);});
+
+  /* ④ 日线位置 */
+  html+=sec('日线位置','近 40 个交易日 · 5/20 日均线',
+    `<div class="grid">
+       <div class="chart span7"><h3>日K与均线</h3><div class="ec" id="st-dk"></div></div>
+       <div class="tbl span5"><h3>位置读数</h3>${tbl(['项','数值','说明'],S.daily.pos)}</div>
+     </div>`);
+  jobs.push(()=>mkCandle('st-dk',S.daily.k));
+
+  /* ⑤ 情绪与板块环境 */
+  html+=sec('情绪与板块环境','引用当日复盘已落盘数据，不重算',
+    `<div class="cards">${S.context.cards.map(c=>card(...c)).join('')}</div>`);
+
+  /* ⑥ 对策与预案 */
+  html+=sec('对策与预案','介入/失效/兑现/持有分档——全部条件化可验证',
+    `<div class="tbl" style="margin-bottom:8px">${tbl(['场景','条件 → 动作'],S.plan.rows)}</div>
+     <div class="note">${esc(S.plan.ledger)}</div>`);
+
+  app.innerHTML=html;
+  jobs.forEach(f=>{try{f();}catch(e){}});
+  window.addEventListener('resize',()=>{clearTimeout(window.__rsT);
+    window.__rsT=setTimeout(()=>{jobs.forEach(f=>{try{f();}catch(e){}});},200);});
+}
+
 /* ================= 数据入口 ================= */
 const REAL=window.REAL_DATA||null;
-if(REAL){renderReview(REAL);}
+if(REAL){(REAL.meta.type==='stock'?renderStock:renderReview)(REAL);}
 else{
   document.getElementById('demoTip').hidden=false;
   renderReview(DEMO());
