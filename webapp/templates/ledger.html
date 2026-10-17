@@ -9,6 +9,15 @@
   <div class="card"><div class="k">胜率</div><div class="v">{{ stats.胜率 if stats.胜率 is not none else '—' }}{% if stats.胜率 is not none %}%{% endif %}</div><div class="s">大样本才有意义</div></div>
 </div>
 {% if by_dir %}<div class="note">按方向：{% for k, v in by_dir.items() %}{{ k }} → 对{{ v.对 }}/错{{ v.错 }}{% if v.其他 %}/其他{{ v.其他 }}{% endif %}　{% endfor %}</div>{% endif %}
+{% if by_refs %}
+<div class="tbl" style="margin-bottom:10px"><h3>条目级胜率（依据方法论条目聚合——策略迭代的统计基础；样本小仅作跟踪，勿过早下结论）</h3>
+<table><thead><tr><th>条目</th><th>对</th><th>错</th><th>其他</th><th>待验证</th><th>胜率</th></tr></thead><tbody>
+{% for ref, v in by_refs %}
+<tr><td class="cold">{{ ref }}</td><td class="up">{{ v.对 }}</td><td class="down">{{ v.错 }}</td><td>{{ v.其他 }}</td><td class="warn">{{ v.待 }}</td>
+    <td>{% set n = v.对 + v.错 %}{% if n %}{{ ((v.对 / n * 100) | round(1)) }}%{% else %}—{% endif %}</td></tr>
+{% endfor %}
+</tbody></table></div>
+{% endif %}
 <div class="tbl">
 <table>
 <thead><tr><th>id</th><th>登记</th><th>标的</th><th>方向</th><th>判断内容</th><th>依据</th><th>验证</th><th>结果</th></tr></thead>

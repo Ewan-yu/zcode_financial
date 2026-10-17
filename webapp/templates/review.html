@@ -5,11 +5,45 @@
   <h1 id="h-title">复盘</h1>
   <span class="date" id="h-date"></span>
   <span class="badge" id="h-badge"></span>
+  <span style="margin-left:auto;font-size:13px">
+    {% if prev %}<a href="{{ url_for('review', date=prev) }}">← 前一交易日</a>{% endif %}
+    {% if nxt %}　<a href="{{ url_for('review', date=nxt) }}">后一交易日 →</a>{% endif %}
+    　<a href="{{ url_for('trend') }}">情绪时序 →</a>
+  </span>
 </header>
+<div style="margin:0 0 10px;font-size:12.5px;color:var(--muted)">
+  已入库复盘日：
+  {% for d in dates %}<a href="{{ url_for('review', date=d) }}" style="margin-right:8px">{{ d[5:] }}</a>{% endfor %}
+</div>
+
+<div class="grid" style="margin-bottom:14px">
+  <div class="chart span6"><h3>近期情绪趋势（涨停家数 / 溢价%）</h3><div class="ec" id="rt1" style="height:210px"></div></div>
+  <div class="tbl span6"><h3>近期决策与验证</h3>
+    <table><thead><tr><th>登记</th><th>标的</th><th>方向</th><th>判断摘要</th><th>结果</th></tr></thead><tbody>
+    {% for p in recent_preds %}
+    <tr><td>{{ p.reg_date }}</td>
+        <td>{% if p.code != 'MARKET' %}<a href="{{ url_for('stock', code=p.code) }}">{{ p.name }}</a>{% else %}{{ p.name }}{% endif %}</td>
+        <td>{{ p.direction }}</td>
+        <td>{{ (p.content or '')[:34] }}{% if (p.content or '')|length > 34 %}…{% endif %}</td>
+        <td class="{{ 'up' if p.result == '对' else 'down' if p.result == '错' else 'warn' }}">{{ p.result or '待验证' }}</td></tr>
+    {% else %}<tr><td colspan="5">无</td></tr>{% endfor %}
+    </tbody></table>
+    <div style="font-size:12px;color:var(--muted);margin-top:6px">近期基调演变：
+      {% for r in recent %}<span class="tag">{{ r.date[5:] }} {{ r.combo_tone or (r.l1 or '') ~ ('×' ~ r.l2 if r.l2 else '') }}</span>{% endfor %}</div>
+  </div>
+</div>
+
 <div id="app"></div>
 <footer><b>数据出处</b>：<span id="prov-body"></span>（webapp 从 workbench.db 组装；门槛四条件全文见当日报告）</footer>
 <script>
 const REAL_DATA = {{ data | tojson }};
+const RECENT = {{ recent | tojson }};
 WB.render(REAL_DATA);
+if (RECENT.length) {
+  const ds = RECENT.map(r => r.date.slice(5));
+  WB.mkLine('rt1', {times: ds, series: [
+    {name: '涨停家数', data: RECENT.map(r => r.limit_ups), color: '#e5484d'},
+    {name: '溢价%', data: RECENT.map(r => r.premium), color: '#e2b341'}]});
+}
 </script>
 {% endblock %}

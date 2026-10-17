@@ -123,7 +123,24 @@ def ledger():
     for r in done:
         by_dir.setdefault(r["direction"], {"对": 0, "错": 0, "其他": 0})
         by_dir[r["direction"]]["对" if r["result"] == "对" else "错" if r["result"] == "错" else "其他"] += 1
-    return render_template("ledger.html", rows=rows, stats=stats, by_dir=by_dir)
+    # 条目级胜率：依据条目拆分聚合（策略更新与选股胜率的统计跟踪）
+    by_refs = {}
+    for r in rows:
+        for ref in re.split(r"[;；,，]", r["refs"] or ""):
+            ref = ref.strip()
+            if not ref or ref == "盘感":
+                continue
+            s = by_refs.setdefault(ref, {"对": 0, "错": 0, "其他": 0, "待": 0})
+            if r["result"] == "对":
+                s["对"] += 1
+            elif r["result"] == "错":
+                s["错"] += 1
+            elif r["result"]:
+                s["其他"] += 1
+            else:
+                s["待"] += 1
+    by_refs = sorted(by_refs.items(), key=lambda kv: -(kv[1]["对"] + kv[1]["错"] + kv[1]["其他"] + kv[1]["待"]))
+    return render_template("ledger.html", rows=rows, stats=stats, by_dir=by_dir, by_refs=by_refs)
 
 
 # ---------------- 页面：股池 ----------------
@@ -206,7 +223,16 @@ def review(date):
     data = build_review_data(date)
     if data is None:
         abort(404)
-    return render_template("review.html", data=data, date=date)
+    dates = [r["date"] for r in q("SELECT date FROM sentiment ORDER BY date")]
+    i = dates.index(date) if date in dates else -1
+    recent = q("SELECT date,limit_ups,limit_downs,max_boards,promo_rate,premium,amount_yi,"
+               "l1,l2,combo_tone FROM sentiment WHERE date<=? ORDER BY date DESC LIMIT 10",
+               (date,))[::-1]
+    recent_preds = q("SELECT * FROM predictions ORDER BY reg_date DESC, id DESC LIMIT 8")
+    return render_template("review.html", data=data, date=date, dates=dates,
+                           prev=dates[i - 1] if i > 0 else None,
+                           nxt=dates[i + 1] if 0 <= i < len(dates) - 1 else None,
+                           recent=recent, recent_preds=recent_preds)
 
 
 def build_review_data(d):
