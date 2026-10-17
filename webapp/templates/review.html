@@ -17,25 +17,33 @@
 </div>
 
 <div class="grid" style="margin-bottom:14px">
-  <div class="chart span6"><h3>近期情绪趋势（涨停家数 / 溢价%）</h3><div class="ec" id="rt1" style="height:210px"></div></div>
-  <div class="tbl span6"><h3>近期决策与验证</h3>
-    <table><thead><tr><th>登记</th><th>标的</th><th>方向</th><th>判断摘要</th><th>结果</th></tr></thead><tbody>
-    {% for p in recent_preds %}
-    <tr><td>{{ p.reg_date }}</td>
-        <td>{% if p.code != 'MARKET' %}<a href="{{ url_for('stock', code=p.code) }}">{{ p.name }}</a>{% else %}{{ p.name }}{% endif %}</td>
-        <td>{{ p.direction }}</td>
-        <td><details style="font-size:12px"><summary style="cursor:pointer">{{ (p.content or '')[:30] }}…（展开全文）</summary>
-          <div class="op-body" style="font-size:12px">{{ p.content }}</div>
-          {% if p.trigger_cond %}<div class="op-row trig"><span class="lab">▲ 介入/触发</span><span class="txt">{{ p.trigger_cond }}</span></div>{% endif %}
-          {% if p.invalid_cond %}<div class="op-row inval"><span class="lab">▼ 失效/止损</span><span class="txt">{{ p.invalid_cond }}</span></div>{% endif %}
-        </details></td>
-        <td class="{{ 'up' if p.result == '对' else 'down' if p.result == '错' else 'warn' }}">{{ p.result or '待验证' }}</td></tr>
-    {% else %}<tr><td colspan="5">无</td></tr>{% endfor %}
-    </tbody></table>
-    <div style="font-size:12px;color:var(--muted);margin-top:6px">近期基调演变：
-      {% for r in recent %}<span class="tag">{{ r.date[5:] }} {{ r.combo_tone or (r.l1 or '') ~ ('×' ~ r.l2 if r.l2 else '') }}</span>{% endfor %}</div>
+  <div class="chart span7"><h3>近期情绪趋势（涨停家数 / 溢价%）</h3><div class="ec" id="rt1" style="height:216px"></div></div>
+  <div class="tbl span5"><h3>近期基调演变</h3>
+    <div style="padding:6px 2px;line-height:2.2">
+      {% for r in recent %}<span class="tag">{{ r.date[5:] }}　{{ r.combo_tone or (r.l1 or '') ~ ('×' ~ r.l2 if r.l2 else '') }}</span>{% endfor %}
+    </div>
+    <div style="font-size:12px;color:var(--muted);border-top:1px dashed var(--line);padding-top:8px;margin-top:4px">
+      当前：{{ recent[-1].l2 if recent else '—' }}（{{ recent[-1].combo_tone if recent else '—' }}）
+      {% if recent|length > 1 %}· 前日：{{ recent[-2].l2 }}{% endif %}
+    </div>
   </div>
 </div>
+
+<div class="sec"><h2>近期决策与验证 <span class="sub">判断全文与触发/失效条件</span></h2>
+<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(440px,1fr))">
+{% for p in recent_preds %}
+<div class="opcard {{ 'dir-up' if '多' in (p.direction or '') else 'dir-down' if '空' in (p.direction or '') else '' }}">
+  <div class="op-h">
+    <span class="t">{% if p.code != 'MARKET' %}<a href="{{ url_for('stock', code=p.code) }}">{{ p.name }}</a><span class="cd">{{ p.code }}</span>{% else %}{{ p.name }}{% endif %}
+      <span class="badge {{ 'up' if '多' in (p.direction or '') else 'down' if '空' in (p.direction or '') else 'warn' }}" style="margin-left:6px">{{ p.direction }}</span></span>
+    <span class="meta">登记 {{ p.reg_date }}　验证 {{ p.verify_date or p.timeframe or '—' }}　<span class="{{ 'up' if p.result == '对' else 'down' if p.result == '错' else 'warn' }}">{{ p.result or '待验证' }}</span></span>
+  </div>
+  <div class="op-body">{{ p.content }}</div>
+  {% if p.trigger_cond %}<div class="op-row trig"><span class="lab">▲ 介入/触发</span><span class="txt">{{ p.trigger_cond }}</span></div>{% endif %}
+  {% if p.invalid_cond %}<div class="op-row inval"><span class="lab">▼ 失效/止损</span><span class="txt">{{ p.invalid_cond }}</span></div>{% endif %}
+</div>
+{% else %}<div class="note">暂无决策记录。</div>{% endfor %}
+</div></div>
 
 <div id="app"></div>
 <footer><b>数据出处</b>：<span id="prov-body"></span>（webapp 从 workbench.db 组装；门槛四条件全文见当日报告）</footer>
