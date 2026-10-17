@@ -39,6 +39,9 @@ description: 短线盘中盯盘与单票快诊（模块A）。当用户在盘中
    ```
 5. 产生的可验证判断当场追加 `predictions/predictions.csv`。
 
+> 需要图形看板时按 dt-review 第 7 步的可视化产出规范执行（加载 visualize 技能 +
+> 会话目录 + **最终回复中引用链接**，否则用户看不到）。单票快诊默认一屏文本优先，速度为主。
+
 ## 模式二：自选池扫描
 
 1. 读 watchlist（status ∈ {观察中, 重点, 持仓} 的 stock + etf；观察票是主对象）。

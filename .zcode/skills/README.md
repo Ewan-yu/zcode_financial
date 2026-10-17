@@ -21,4 +21,6 @@
 | 策略回测 | 手动 / 闲时任务 | 规则回测与绩效评估（调用 tools/backtest） |
 | 基金跟踪 | 周度定时 | ETF 场内跟踪 + 场外基金净值 / 风格周报 |
 
-子 agent：`.zcode/agents/dt-trader.md`（短线交易员）已建成；vf-analyst（基本面研究员）待模块 B。
+子 agent：`.zcode/agents/dt-trader.md`（短线交易员，主力模型 GLM-5.3，负责判断层）与
+`.zcode/agents/dt-scout.md`（数据侦察员，GLM-5.3-Flash，负责取数落盘层，省 token）已建成；
+vf-analyst（基本面研究员）待模块 B。
