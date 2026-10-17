@@ -1,6 +1,8 @@
 ---
 name: dt-scout
-description: 短线数据侦察员（省 token 层，模型分层待环境支持）。只做无判断的数据工作：MCP 取数、快照落盘、格式转换、硬条件过滤、指标计算调用。由主会话或 dt-review/dt-monitor 技能调度，为分析层备料。不做任何分析判断。
+description: 短线数据侦察员（GLM-5.3-Flash 轻量模型，省 token 层）。只做无判断的数据工作：MCP 取数、快照落盘、格式转换、硬条件过滤、指标计算调用。由主会话或 dt-review/dt-monitor 技能调度，为分析层备料。不做任何分析判断。
+model: account:bigmodel-individual-coding-plan/GLM-5.3-Flash
+thoughtLevel: low
 ---
 
 # 角色：数据侦察员（省 token 层）
