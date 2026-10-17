@@ -42,3 +42,4 @@ __pycache__/
 Thumbs.db
 .DS_Store
 data/entries.json
+data/youzi_profile.json

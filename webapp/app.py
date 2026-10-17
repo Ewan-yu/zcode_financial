@@ -345,6 +345,27 @@ def build_review_data(d):
     }
 
 
+# ---------------- 页面：柚子哥（实证校准） ----------------
+
+@app.route("/youzi")
+def youzi():
+    rows = q("SELECT * FROM youzi_picks ORDER BY date DESC, code")
+    recs = []
+    for r in rows:
+        recs.append({**r, "f": jload(r.get("features"), {}) or {},
+                     "w": jload(r.get("fwd"), {}) or {}})
+    t1 = [r["w"].get("t1_close%") for r in recs if r["w"].get("t1_close%") is not None]
+    retr = [r["w"].get("t1_冲高回落%") for r in recs if r["w"].get("t1_冲高回落%") is not None]
+    stats = {"记录数": len(recs), "标的数": len({r["code"] for r in recs}),
+             "T+1均值%": round(sum(t1) / len(t1), 2) if t1 else None,
+             "T+1平均冲高回落%": round(sum(retr) / len(retr), 2) if retr else None}
+    profile = None
+    pp = ROOT / "data" / "youzi_profile.json"
+    if pp.exists():
+        profile = json.loads(pp.read_text(encoding="utf-8"))
+    return render_template("youzi.html", recs=recs, stats=stats, profile=profile)
+
+
 # ---------------- 页面：个股档案（P3） ----------------
 
 @app.route("/stock/<code>")
