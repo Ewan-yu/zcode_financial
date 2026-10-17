@@ -133,7 +133,7 @@ COLS = {
         "entry_ref": "参考介入价（如提供；NULL=未知）",
         "features": "JSON 入选日特征快照（板块/收盘/振幅特征/近5日高点距离/换手/成交额/启动结构）",
         "fwd": "JSON 前向收益与柚子哥操作 {t1_open%/t1_high%/t1_close%/t1_冲高回落%/t3%/t5%/t10%/author_action}",
-        "watch_date": "加入观察日（用户要求必记）", "buy_date": "买入日（未提供则 NULL）",
+        "watch_date": "加入股池日（用户口径：只能提供加入股池/卖出两个时点）", "buy_date": "买入日（预留列——用户无法提供介入时点，实际不使用）",
         "sell_date": "卖出日", "sell_price": "卖出价（与 entry_ref 算操作盈亏%）",
     },
 }

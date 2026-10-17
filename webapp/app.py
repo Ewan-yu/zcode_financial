@@ -357,7 +357,7 @@ def youzi():
         # 生命周期派生：状态 / 观察→卖出自然日 / 操作盈亏%
         import datetime as _dt
         wd, bd, sd = rec.get("watch_date"), rec.get("buy_date"), rec.get("sell_date")
-        rec["status"] = ("已了结" if sd else "持有中" if bd else "观察中")
+        rec["status"] = ("已了结" if sd else "在池中")
         try:
             d0 = _dt.date.fromisoformat((wd or rec["date"])[:10])
             d1 = _dt.date.fromisoformat((sd or _dt.date.today().isoformat())[:10])
@@ -373,10 +373,9 @@ def youzi():
     stats = {"记录数": len(recs), "标的数": len({r["code"] for r in recs}),
              "T+1均值%": round(sum(t1) / len(t1), 2) if t1 else None,
              "T+1平均冲高回落%": round(sum(retr) / len(retr), 2) if retr else None,
-             "状态分布": "了结%d / 持有%d / 观察%d" % (
+             "状态分布": "了结%d / 在池%d" % (
                  sum(1 for r in recs if r["status"] == "已了结"),
-                 sum(1 for r in recs if r["status"] == "持有中"),
-                 sum(1 for r in recs if r["status"] == "观察中")),
+                 sum(1 for r in recs if r["status"] == "在池中"), 0),
              "操作盈亏均值%": round(sum(ops) / len(ops), 2) if ops else None}
     profile = None
     pp = ROOT / "data" / "youzi_profile.json"
