@@ -30,3 +30,9 @@
    （raw 原始资料、distilled 方法论、data/ 数据、portfolio 实际持仓、predictions 台账、
    reports 报告、docs/ 模块设计文档——含方法论流程细节）仅存本地，由 `.gitignore` 强制排除。
    禁止用 `git add -f` 绕过；提交前如新增文件位于这些目录，须确认未被误加。
+12. **证据链与模板化输出**：四类分析产出（整体复盘 / 单票分析 / 板块对比 / 盘前简报）
+    一律逐节套用 `templates/dt/` 固定模板，禁止增删章节与内容漂移；报告中每个数字必须
+    可溯源到落盘快照（`data/snapshots/`、`data/cache/`）或当次工具返回，取不到写
+    「数据缺失（原因）」，禁止估算编造；同一标的重复分析必须含「前次判断对账」节；
+    交付前跑 `python tools/report_lint.py` 自检；用户可见看板不出现知识条目编号，
+    以 `templates/dt/dashboard.html` 为统一骨架。
