@@ -87,12 +87,14 @@ const tailPct = x => {
 const tip = {trigger:'axis',backgroundColor:'#fff',borderColor:'#e5e7eb',textStyle:{color:'#374151',fontSize:12},
   axisPointer:{type:'cross',crossStyle:{color:'#999'}}};
 
-// 蓝色家数（锚点有家数者 + 我方观测）与比例（锚点全部 + 观测）
+// 蓝色家数（锚点有家数者 + 我方观测）与比例（锚点全部 + 观测）——必须按日期排序后渲染
+const byDate = (a, b) => (a[0] < b[0] ? -1 : 1);
 const cntPts = ANCHORS.filter(a=>a.sample_count!=null).map(a=>[a.date,a.sample_count])
-  .concat(OBS.filter(o=>o.sample_count!=null).map(o=>[o.date,o.sample_count]));
-const ratioPts = ANCHORS.map(a=>[a.date,a.value]).concat(OBS.map(o=>[o.date,o.value]));
-const pctPts = ANCHORS.concat(OBS).map(p=>{const v=p.value, pc=tailPct(v);
-  return pc!=null?[p.date, Math.round((100-pc)*10)/10]:[p.date,null];});
+  .concat(OBS.filter(o=>o.sample_count!=null).map(o=>[o.date,o.sample_count])).sort(byDate);
+const ratioPts = ANCHORS.map(a=>[a.date,a.value]).concat(OBS.map(o=>[o.date,o.value])).sort(byDate);
+const pctPts = ANCHORS.concat(OBS).map(p=>({v:p.value, d:p.date}))
+  .sort((a,b)=>a.d<b.d?-1:1).map(p=>{const pc=tailPct(p.v);
+  return pc!=null?[p.d, Math.round((100-pc)*10)/10]:[p.d,null];});
 
 function slice(arr, n){ return arr.slice(Math.max(0, arr.length-n)); }
 const RANGES = {
@@ -106,7 +108,7 @@ let mainChart=null, subChart=null, curRange='all', curSub='ratio';
 function drawMain(){
   const idx = RANGES[curRange];
   const inWin = p => !idx.length || (p[0]>=idx[0][0] && p[0]<=idx[idx.length-1][0]);
-  const cnt = cntPts.filter(inWin), rat = ratioPts.filter(inWin);
+  const cnt = cntPts.filter(inWin);
   if (mainChart) mainChart.dispose();
   mainChart = echarts.init(document.getElementById('cMain'));
   mainChart.setOption({
@@ -119,10 +121,11 @@ function drawMain(){
     series:[
       {name:'指数',type:'line',data:idx,yAxisIndex:0,symbol:'none',lineStyle:{color:'#e5484d',width:1.6},
        tooltip:{valueFormatter:v=>v}},
-      {name:'破净股家数',type:'line',data:cnt,yAxisIndex:1,symbol:'circle',symbolSize:7,connectNulls:true,
-       lineStyle:{color:'#3b82f6',width:1.6,type:cnt.length>2?'solid':'dashed'},itemStyle:{color:'#3b82f6'},
-       tooltip:{valueFormatter:v=>v+' 家'}},
-      {name:'比例点',type:'scatter',data:rat.map(p=>({value:[p[0],null],ratio:p[1]})),yAxisIndex:1,symbolSize:0,silent:true}
+      {name:'破净股家数',type:'line',data:cnt,yAxisIndex:1,symbol:'circle',symbolSize:5,connectNulls:true,smooth:true,
+       lineStyle:{color:'#3b82f6',width:1.8},itemStyle:{color:'#3b82f6'},
+       areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[
+         {offset:0,color:'rgba(59,130,246,.22)'},{offset:1,color:'rgba(59,130,246,.02)'}]}},
+       tooltip:{valueFormatter:v=>v+' 家'}}
     ]});
 }
 function drawSub(){
