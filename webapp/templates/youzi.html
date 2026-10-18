@@ -51,7 +51,7 @@
       {% else %}待积累{% endif %}</td>
   <td>{% if r.op_ret is not none %}<span class="{{ 'up' if r.op_ret > 0 else 'down' }}">{{ r.op_ret }}%</span>{% else %}—{% endif %}</td>
 </tr>
-<tr><td colspan="8" style="padding:0"><details style="font-size:12px;padding:6px 8px;background:rgba(42,50,62,.18)">
+<tr><td colspan="8" style="padding:0"><details style="font-size:12px;padding:6px 8px;background:rgba(31,41,55,.04)">
   <summary style="cursor:pointer;color:var(--muted)">展开特征与前向全文</summary>
   <div class="op-body" style="font-size:12px;margin:6px 0">入选日特征：{% for k, v in r.f.items() %}{{ k }}={{ v }}；{% endfor %}</div>
   <div class="op-body" style="font-size:12px">前向收益：{% for k, v in r.w.items() %}{{ k }}={{ v }}；{% endfor %}</div>

@@ -40,7 +40,7 @@
       <button class="pill" data-range="y1">近1年</button>
     </div>
     <div style="font-size:12px;color:var(--muted)">
-      <span style="color:#e5484d">━</span> 指数（左轴）　<span style="color:#3b82f6">━</span> 破净股家数（右轴）
+      <span style="color:#dc2626">━</span> 指数（左轴）　<span style="color:#3b82f6">━</span> 破净股家数（右轴）
     </div>
   </div>
   <div class="ec" id="cMain" style="height:400px"></div>
@@ -60,7 +60,7 @@
 </div>
 
 <style>
-.pill{border:1px solid #2a323e;background:transparent;color:#8b95a5;border-radius:16px;padding:4px 14px;font-size:12px;cursor:pointer}
+.pill{border:1px solid #e5e7eb;background:transparent;color:#6b7280;border-radius:16px;padding:4px 14px;font-size:12px;cursor:pointer}
 .pill.active{background:#e5e7eb;color:#111827;border-color:#e5e7eb;font-weight:600}
 </style>
 
@@ -110,7 +110,7 @@ function drawMain(){
       {type:'value',scale:true,axisLabel:{color:'#6b7280',fontSize:11,formatter:v=>v>=1000?(v/1000)+'k':v},splitLine:{lineStyle:{color:'#f3f4f6'}}},
       {type:'value',min:0,max:900,axisLabel:{color:'#6b7280',fontSize:11},splitLine:{show:false}}],
     series:[
-      {name:'指数',type:'line',data:idx,yAxisIndex:0,symbol:'none',lineStyle:{color:'#e5484d',width:1.6},
+      {name:'指数',type:'line',data:idx,yAxisIndex:0,symbol:'none',lineStyle:{color:'#dc2626',width:1.6},
        tooltip:{valueFormatter:v=>v}},
       {name:'破净股家数',type:'line',data:cnt,yAxisIndex:1,symbol:cnt.length>400?'none':'circle',symbolSize:5,connectNulls:true,smooth:cnt.length<=400,
        sampling:'lttb',

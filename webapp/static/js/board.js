@@ -2,13 +2,13 @@
    页面需提供容器：#h-title #h-date #h-badge #app #prov-body，并先加载 ECharts。
    用法：WB.render(REAL_DATA)（复盘六模块） / WB.renderStock(STOCK_DATA)（个股六模块） */
 /* ================= 基础 ================= */
-const UP='#e5484d', DOWN='#2fb37c', WARN='#e2b341', ACCENT='#4c8dff',
-      MUTED='#8b95a5', LINE='#2a323e', TEXT='#d8dee8';
+const UP='#dc2626', DOWN='#0e9f6e', WARN='#d97706', ACCENT='#2563eb',
+      MUTED='#6b7280', LINE='#e5e7eb', TEXT='#1f2937';
 const STAGE_COLOR={'冰点':MUTED,'启动':ACCENT,'发酵':UP,'高潮':WARN,'退潮':DOWN};
 const FONT={fontFamily:'Microsoft YaHei,PingFang SC,sans-serif',fontSize:11,color:MUTED};
-const AXIS={axisLine:{lineStyle:{color:LINE}},axisLabel:FONT,splitLine:{lineStyle:{color:'rgba(42,50,62,.5)'}}};
+const AXIS={axisLine:{lineStyle:{color:LINE}},axisLabel:FONT,splitLine:{lineStyle:{color:'rgba(31,41,55,.08)'}}};
 const grid={left:56,right:20,top:32,bottom:26};
-const tooltip={trigger:'axis',backgroundColor:'#1b222c',borderColor:LINE,textStyle:{color:TEXT,fontSize:12}};
+const tooltip={trigger:'axis',backgroundColor:'#ffffff',borderColor:LINE,textStyle:{color:TEXT,fontSize:12}};
 
 function toneClass(w){
   if(/退潮|低迷|深冬|冰点|跌|拦截|回避/.test(w))return 'down';
@@ -62,7 +62,7 @@ function mkLine(id,{times,series,area}){
 }
 function mkBar(id,{cats,values,colors,unit,horizontal}){
   chart(id).setOption({backgroundColor:'transparent',
-    tooltip:{trigger:'item',backgroundColor:'#1b222c',borderColor:LINE,
+    tooltip:{trigger:'item',backgroundColor:'#ffffff',borderColor:LINE,
       textStyle:{color:TEXT,fontSize:12},formatter:p=>`${p.name}：${p.value}${unit||''}`},
     grid:horizontal?{left:96,right:40,top:8,bottom:26}:grid,
     xAxis:{type:horizontal?'value':'category',data:horizontal?undefined:cats,...AXIS},
@@ -82,7 +82,7 @@ function mkIdxTrend(id,{dates,close,amount}){
             {name:'20日线',type:'line',data:ma(close,20),showSymbol:false,connectNulls:true,
               lineStyle:{color:WARN,width:1.2}},
             {name:'成交额',type:'bar',yAxisIndex:1,data:amount,
-              itemStyle:{color:'rgba(139,149,165,.35)'}}]});
+              itemStyle:{color:'rgba(107,114,128,.25)'}}]});
 }
 function mkCandle(id,{dates,ohlc,ma5,ma20}){
   chart(id).setOption({backgroundColor:'transparent',tooltip,

@@ -54,8 +54,8 @@ WB.render(REAL_DATA);
 if (RECENT.length) {
   const ds = RECENT.map(r => r.date.slice(5));
   WB.mkLine('rt1', {times: ds, series: [
-    {name: '涨停家数', data: RECENT.map(r => r.limit_ups), color: '#e5484d'},
-    {name: '溢价%', data: RECENT.map(r => r.premium), color: '#e2b341'}]});
+    {name: '涨停家数', data: RECENT.map(r => r.limit_ups), color: '#dc2626'},
+    {name: '溢价%', data: RECENT.map(r => r.premium), color: '#d97706'}]});
 }
 </script>
 {% endblock %}

@@ -1,7 +1,7 @@
 :root{
-  --bg:#0e1116; --panel:#161b22; --panel2:#1b222c; --line:#2a323e;
-  --text:#d8dee8; --muted:#8b95a5; --accent:#4c8dff;
-  --up:#e5484d; --down:#2fb37c; --warn:#e2b341;
+  --bg:#f5f7fa; --panel:#ffffff; --panel2:#eef1f6; --line:#e3e7ee;
+  --text:#1f2937; --muted:#64748b; --accent:#2563eb;
+  --up:#dc2626; --down:#0e9f6e; --warn:#d97706;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -38,7 +38,7 @@ header.page .date{color:var(--muted);font-size:13px}
 .strip{display:flex;gap:4px;margin:6px 0 10px}
 .strip .seg{flex:1;text-align:center;padding:7px 0 5px;border-radius:8px;background:var(--panel2);
   border:1px solid var(--line);color:var(--muted);font-size:12px}
-.strip .seg.on{color:#fff;font-weight:600;box-shadow:0 0 0 1px currentColor inset}
+.strip .seg.on{background:var(--accent);color:#fff;font-weight:600;box-shadow:0 0 0 1px currentColor inset}
 .strip .seg .tip{display:block;font-size:11px;opacity:.75}
 .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:10px}
 .chart{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px 6px}
@@ -50,7 +50,7 @@ header.page .date{color:var(--muted);font-size:13px}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{color:var(--muted);font-weight:600;text-align:left;border-bottom:1px solid var(--line);
   padding:6px 8px;white-space:nowrap}
-td{border-bottom:1px solid rgba(42,50,62,.55);padding:6px 8px;vertical-align:top}
+td{border-bottom:1px solid rgba(31,41,55,.10);padding:6px 8px;vertical-align:top}
 tr:last-child td{border-bottom:none}
 td.up,span.up{color:var(--up)} td.down,span.down{color:var(--down)} td.warn,span.warn{color:var(--warn)}
 td.cold,span.cold{color:var(--accent)}
@@ -103,7 +103,7 @@ textarea{min-height:110px;resize:vertical}
 .op-h .cd{color:var(--muted);font-size:11px;font-weight:400;margin-left:4px}
 .op-h .meta{font-size:11px;color:var(--muted);white-space:nowrap}
 .op-body{font-size:12.8px;line-height:1.7;margin:9px 0 7px;padding:8px 12px;
-  background:rgba(42,50,62,.28);border-radius:8px}
+  background:rgba(31,41,55,.05);border-radius:8px}
 .op-row{display:flex;gap:9px;align-items:flex-start;font-size:12.3px;line-height:1.65;margin-top:6px}
 .op-row .lab{flex:none;font-size:11px;line-height:1.5;padding:1px 8px;border-radius:6px;
   border:1px solid;white-space:nowrap;margin-top:2px}

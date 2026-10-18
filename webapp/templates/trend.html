@@ -20,21 +20,21 @@ const ds = S.map(r => r.date.slice(5));
 if (S.length && typeof echarts !== 'undefined') {
   echarts.init(document.getElementById('c1')).setOption({
     backgroundColor:'transparent',
-    tooltip:{trigger:'axis',backgroundColor:'#1b222c',borderColor:'#2a323e',textStyle:{color:'#d8dee8',fontSize:12}},
-    legend:{textStyle:{color:'#8b95a5',fontSize:11},top:0},
+    tooltip:{trigger:'axis',backgroundColor:'#ffffff',borderColor:'#e5e7eb',textStyle:{color:'#1f2937',fontSize:12}},
+    legend:{textStyle:{color:'#6b7280',fontSize:11},top:0},
     grid:{left:46,right:16,top:30,bottom:26},
-    xAxis:{type:'category',data:ds,axisLabel:{color:'#8b95a5',fontSize:11},axisLine:{lineStyle:{color:'#2a323e'}}},
-    yAxis:{type:'value',axisLabel:{color:'#8b95a5',fontSize:11},splitLine:{lineStyle:{color:'rgba(42,50,62,.5)'}}},
+    xAxis:{type:'category',data:ds,axisLabel:{color:'#6b7280',fontSize:11},axisLine:{lineStyle:{color:'#e5e7eb'}}},
+    yAxis:{type:'value',axisLabel:{color:'#6b7280',fontSize:11},splitLine:{lineStyle:{color:'rgba(31,41,55,.08)'}}},
     series:[
-      {name:'涨停家数',type:'bar',data:S.map(r => r.limit_ups),itemStyle:{color:'#e5484d'},barMaxWidth:20},
-      {name:'跌停家数',type:'bar',data:S.map(r => r.limit_downs),itemStyle:{color:'#2fb37c'},barMaxWidth:20}]});
+      {name:'涨停家数',type:'bar',data:S.map(r => r.limit_ups),itemStyle:{color:'#dc2626'},barMaxWidth:20},
+      {name:'跌停家数',type:'bar',data:S.map(r => r.limit_downs),itemStyle:{color:'#0e9f6e'},barMaxWidth:20}]});
   WB.mkLine('c2', {times: ds, series: [
-    {name: '晋级率%', data: S.map(r => r.promo_rate), color: '#4c8dff'},
-    {name: '溢价%', data: S.map(r => r.premium), color: '#e2b341'}]});
+    {name: '晋级率%', data: S.map(r => r.promo_rate), color: '#2563eb'},
+    {name: '溢价%', data: S.map(r => r.premium), color: '#d97706'}]});
 }
 if (I.length) WB.mkIdxTrend('c3', {dates: I.map(r => r.date.slice(5)), close: I.map(r => r.close), amount: I.map(r => r.amount_yi)});
 if (B.length) WB.mkLine('c4', {times: B.map(r => r.date.slice(5)), series: [
-  {name: '上涨家数', data: B.map(r => r.up_count), color: '#e5484d'},
-  {name: '下跌家数', data: B.map(r => r.down_count), color: '#2fb37c'}]});
+  {name: '上涨家数', data: B.map(r => r.up_count), color: '#dc2626'},
+  {name: '下跌家数', data: B.map(r => r.down_count), color: '#0e9f6e'}]});
 </script>
 {% endblock %}
