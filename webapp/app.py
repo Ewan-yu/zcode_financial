@@ -5,6 +5,7 @@
 启动：python webapp/app.py → http://127.0.0.1:8787 （仅本机绑定；写仅 POST /pool/import）
 """
 import json
+import os
 import re
 import sqlite3
 import sys
@@ -17,6 +18,29 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 app = Flask(__name__)
 DB = ROOT / "data" / "workbench.db"
+
+# ---- 进程内缓存（按 DB+mtime 失效：数据一变自动作废，不会显示旧数） ----
+_CACHE = {"epoch": None, "store": {}}
+
+
+def _cache_epoch():
+    try:
+        return max(os.path.getmtime(DB), os.path.getmtime(str(DB) + "-wal"))
+    except OSError:
+        return None
+
+
+def cache_get(key):
+    ep = _cache_epoch()
+    if _CACHE["epoch"] != ep:
+        _CACHE["epoch"] = ep
+        _CACHE["store"].clear()
+    return _CACHE["store"].get(key)
+
+
+def cache_put(key, val):
+    _CACHE["store"][key] = val
+    return val
 # 条目代号→中文标题（本地生成：python tools/gen_entries.py；含方法论标题，不入远端）
 ENTRIES = {}
 _ep = ROOT / "data" / "entries.json"
@@ -418,10 +442,17 @@ def mood():
     """破净股与市场情绪温度看板（版式复刻复利人生 kimi 看板）。
 
     历史底座=乐咕乐股逐日日线（2005 起，浏览器抓取存档后 import-legulegu 入库，
-    沪深口径 totalCompany≈5226 对齐作者），日常增量=问财三段截面（MCP）。
-    自有序列≥250 日后温度与历史百分位改用自有分位（当前约 5272 日），作者尾部分布
-    三点仅作对照备注；子图百分位为逐点 expanding 分位（累计不足 120 日为空）。
+    沪深口径 totalCompany≈5226 对齐作者）。自有序列≥250 日后温度与历史百分位
+    用自有分位（当前约 5272 日），作者尾部分布三点仅作对照备注；子图百分位为
+    逐点 expanding 分位。重计算结果走进程内缓存（DB mtime 失效）。
     """
+    ctx = cache_get("mood:ctx")
+    if ctx is None:
+        ctx = cache_put("mood:ctx", _mood_context())
+    return render_template("mood.html", **ctx)
+
+
+def _mood_context():
     import bisect
     last = q("SELECT date,value,sample_count,denominator FROM mood_obs WHERE key='net_break_pb' ORDER BY date DESC LIMIT 1", one=True)
     anchors = q("SELECT date,label,value,sample_count FROM mood_anchors WHERE key='net_break_pb' ORDER BY date")
@@ -488,10 +519,10 @@ def mood():
 
     ip = ROOT / "data" / "cache" / "mood_index_monthly.json"
     index_m = json.loads(ip.read_text(encoding="utf-8"))["series"] if ip.exists() else []
-    return render_template("mood.html", last=last, anchors=anchors, obs=obs, daily=daily,
-                           index_m=index_m, temp=temp, zone=zone, zcolor=zcolor,
-                           pctile=pctile, narr=narr, zones=ZONES, n_obs=n_obs, pcts=pcts,
-                           spread=spread)
+    return {"last": last, "anchors": anchors, "obs": obs, "daily": daily,
+            "index_m": index_m, "temp": temp, "zone": zone, "zcolor": zcolor,
+            "pctile": pctile, "narr": narr, "zones": ZONES, "n_obs": n_obs, "pcts": pcts,
+            "spread": spread}
 
 
 # ---------------- 页面：个股档案（P3） ----------------
@@ -525,23 +556,20 @@ def stock(code):
 
 # ---------------- 页面：市场广度信号看板（docs/breadth-backtest-design.md v1.2） ----------------
 
-def _bd_chart_payload(conn, code, rng):
-    """选中口径的图表+摘要载荷（页面初始渲染与 /api/breadth/data 共用）。"""
+def _bd_chart_payload(conn, code, rng, sig=None, series=None):
+    """选中口径的图表+摘要载荷（页面初始渲染与 /api/breadth/data 共用）。
+    sig/series 可传入 _breadth_global 的预计算结果，避免重复信号计算。"""
     import breadth as bt
-    s = bt.series(conn, code)
+    s = series if series is not None else bt.series(conn, code)
+    if sig is None:
+        sig = bt.all_signals(conn, code)
     dates_all = [r["date"] for r in s]
     b5_all = [r["b5"] for r in s]
     b20_all = [r["b20"] for r in s]
     b60_all = [r["b60"] for r in s]
     close_all = [r["close"] for r in s]
-    ev_all = {
-        "S1": bt.edge_events(dates_all, b20_all, True, 10),
-        "S2": bt.edge_events(dates_all, b20_all, True, 20),
-        "S7": bt.edge_events(dates_all, b20_all, False, 80),
-        "S13": bt.edge_events(dates_all, b60_all, True, 20),
-        "S14": bt.edge_events(dates_all, b60_all, False, 80),
-        "RES": bt.resonance_events(dates_all, b20_all, b60_all),
-    }
+    ev_all = {sid: [e["date"] for e in sig.get(sid, [])]
+              for sid in ("S1", "S2", "S7", "S13", "S14", "RES")}
     if rng == "1y" and len(dates_all) > 245:
         cut = len(dates_all) - 245
     else:
@@ -577,27 +605,25 @@ def api_breadth_data():
         code = "cyb"
     if rng not in ("1y", "all"):
         rng = "1y"
-    conn = sqlite3.connect(str(DB))
-    conn.row_factory = sqlite3.Row
-    try:
-        return json.dumps(_bd_chart_payload(conn, code, rng), ensure_ascii=False)
-    finally:
-        conn.close()
+    key = f"breadth:payload:{code}:{rng}"
+    payload = cache_get(key)
+    if payload is None:
+        g = cache_get("breadth:global")
+        if g is None:
+            g = cache_put("breadth:global", _breadth_global(bt))
+        conn = sqlite3.connect(str(DB))
+        conn.row_factory = sqlite3.Row
+        try:
+            payload = _bd_chart_payload(conn, code, rng,
+                                        sig=g["sigs"].get(code), series=g["series_map"].get(code))
+        finally:
+            conn.close()
+        cache_put(key, payload)
+    return json.dumps(payload, ensure_ascii=False)
 
 
-@app.route("/breadth")
-def breadth():
-    """复刻复利人生《市场广度》看板：头部共振行+信号图例 + 八口径卡片 + 三段堆叠子图
-    （MA20/MA5/MA60）+ 胜率摘要。口径/区间切换走 /api/breadth/data 前端无刷新重绘。
-    事件口径=滞回（tools/breadth.py）；广度值滞后 15 交易日（乐咕），问财尾部待补。"""
-    import breadth as bt
-
-    code_sel = request.args.get("code", "cyb")
-    if code_sel not in bt.CODE_NAME:
-        code_sel = "cyb"
-    rng = request.args.get("rng", "1y")
-    if rng not in ("1y", "all"):
-        rng = "1y"
+def _breadth_global(bt):
+    """全口径共享计算（缓存一次）：序列/最新值/卡片/信号（含背离，一次算好全局复用）。"""
     conn = sqlite3.connect(str(DB))
     conn.row_factory = sqlite3.Row
     try:
@@ -612,51 +638,10 @@ def breadth():
                          "b20": (last20 or {}).get("b20"),
                          "b60": (last60 or {}).get("b60"),
                          "close": (last20 or last60 or {}).get("close")}
-
-        # 市场状态[发明，以作者 2026-10-14 全A 24.1%→偏弱 校准]：<30 偏弱 / >70 偏强
-        a_now = latest["all"]["b20"]
-        status = ("—" if a_now is None else
-                  ("偏弱" if a_now < 30 else ("偏强" if a_now > 70 else "中性")))
-
-        # 八口径卡片：状态徽章 / 触发信号 / 仓位建议[作者规则]
-        cards, oversold, resonant = [], [], []
-        for c, nm in bt.CODE_NAME.items():
-            L = dict(latest[c])
-            if L["b20"] is None:
-                cards.append({"code": c, "name": nm, **L, "badge": "无数据", "bclass": "gray",
-                              "sigs": [], "pos": "数据滞后中（乐咕 T-15）"})
-                continue
-            sigs = []
-            if L["b20"] < 10: sigs.append("S1")
-            if L["b20"] < 20: sigs.append("S2")
-            if L["b20"] > 80: sigs.append("S7")
-            if L["b60"] is not None:
-                if L["b60"] < 10: sigs.append("S12")
-                if L["b60"] < 20: sigs.append("S13")
-                if L["b60"] > 80: sigs.append("S14")
-            buy_hits = [s for s in sigs if s in ("S1", "S2", "S12", "S13")]
-            if buy_hits:
-                oversold.append(nm)
-                if ("S2" in sigs or "S13" in sigs) and \
-                   ((L["b60"] or 0) < 20) and L["b20"] < 20:
-                    resonant.append({"name": nm, "sigs": sigs})
-            badge = ("超卖" if buy_hits else
-                     ("偏多" if ("S7" in sigs or "S14" in sigs or L["b20"] > 50) else "偏空"))
-            bclass = ("green" if badge == "超卖" else "red" if badge == "偏多" else "yellow")
-            pos = ("60%~80%（S2 建仓/S3 确认加仓）" if buy_hits
-                   else "≤40%~60%（防御持有）")   # [作者规则]
-            cards.append({"code": c, "name": nm, **L, "badge": badge, "bclass": bclass,
-                          "sigs": sigs, "pos": pos})
-
-        # 头部摘要：全A 单独展示，超卖区列表排除全A（避免重复，对齐作者版式）
-        oversold = [n for n in oversold if n != "全A"]
-
-        payload = _bd_chart_payload(conn, code_sel, rng)
-        # 近期事件表（全口径混合，近 40 条）
+        sigs = {c: bt.all_signals(conn, c) for c in bt.CODE_NAME}
         recent = []
         for c, nm in bt.CODE_NAME.items():
-            sig = bt.all_signals(conn, c)
-            for sid, evs in sig.items():
+            for sid, evs in sigs[c].items():
                 if sid in ("S10", "S11", "THR"):
                     continue
                 recent += [{"date": e["date"], "code": nm, "sid": sid} for e in evs]
@@ -665,15 +650,87 @@ def breadth():
     finally:
         conn.close()
 
+    # 市场状态[发明，以作者 2026-10-14 全A 24.1%→偏弱 校准]：<30 偏弱 / >70 偏强
+    a_now = latest["all"]["b20"]
+    status = ("—" if a_now is None else
+              ("偏弱" if a_now < 30 else ("偏强" if a_now > 70 else "中性")))
+
+    # 八口径卡片：状态徽章 / 触发信号 / 仓位建议[作者规则]
+    cards, oversold, resonant = [], [], []
+    for c, nm in bt.CODE_NAME.items():
+        L = dict(latest[c])
+        if L["b20"] is None:
+            cards.append({"code": c, "name": nm, **L, "badge": "无数据", "bclass": "gray",
+                          "sigs": [], "pos": "数据滞后中（乐咕 T-15）"})
+            continue
+        sigs_now = []
+        if L["b20"] < 10: sigs_now.append("S1")
+        if L["b20"] < 20: sigs_now.append("S2")
+        if L["b20"] > 80: sigs_now.append("S7")
+        if L["b60"] is not None:
+            if L["b60"] < 10: sigs_now.append("S12")
+            if L["b60"] < 20: sigs_now.append("S13")
+            if L["b60"] > 80: sigs_now.append("S14")
+        buy_hits = [s for s in sigs_now if s in ("S1", "S2", "S12", "S13")]
+        if buy_hits:
+            oversold.append(nm)
+            if ("S2" in sigs_now or "S13" in sigs_now) and \
+               ((L["b60"] or 0) < 20) and L["b20"] < 20:
+                resonant.append({"name": nm, "sigs": sigs_now})
+        badge = ("超卖" if buy_hits else
+                 ("偏多" if ("S7" in sigs_now or "S14" in sigs_now or L["b20"] > 50) else "偏空"))
+        bclass = ("green" if badge == "超卖" else "red" if badge == "偏多" else "yellow")
+        pos = ("60%~80%（S2 建仓/S3 确认加仓）" if buy_hits
+               else "≤40%~60%（防御持有）")   # [作者规则]
+        cards.append({"code": c, "name": nm, **L, "badge": badge, "bclass": bclass,
+                      "sigs": sigs_now, "pos": pos})
+
+    # 头部摘要：全A 单独展示，超卖区列表排除全A（避免重复，对齐作者版式）
+    oversold = [n for n in oversold if n != "全A"]
+    return {"series_map": series_map, "latest": latest, "cards": cards, "status": status,
+            "oversold": oversold, "resonant": resonant, "a_now": a_now,
+            "all_date": latest["all"]["date"], "sigs": sigs, "recent": recent}
+
+
+@app.route("/breadth")
+def breadth():
+    """复刻复利人生《市场广度》看板：头部共振行+信号图例 + 八口径卡片 + 三段堆叠子图
+    （MA20/MA5/MA60）+ 胜率摘要。口径/区间切换走 /api/breadth/data 前端无刷新重绘。
+    事件口径=滞回（tools/breadth.py）；重计算走进程内缓存（DB mtime 失效）。"""
+    import breadth as bt
+
+    code_sel = request.args.get("code", "cyb")
+    if code_sel not in bt.CODE_NAME:
+        code_sel = "cyb"
+    rng = request.args.get("rng", "1y")
+    if rng not in ("1y", "all"):
+        rng = "1y"
+
+    g = cache_get("breadth:global")
+    if g is None:
+        g = cache_put("breadth:global", _breadth_global(bt))
+    key = f"breadth:payload:{code_sel}:{rng}"
+    payload = cache_get(key)
+    if payload is None:
+        conn = sqlite3.connect(str(DB))
+        conn.row_factory = sqlite3.Row
+        try:
+            payload = _bd_chart_payload(conn, code_sel, rng,
+                                        sig=g["sigs"].get(code_sel),
+                                        series=g["series_map"].get(code_sel))
+        finally:
+            conn.close()
+        cache_put(key, payload)
+
     return render_template("breadth.html", code=code_sel, code_name=bt.CODE_NAME[code_sel],
-                           rng=rng, cards=cards, status=status,
-                           oversold=oversold, resonant=resonant,
-                           all_b20=a_now, all_date=latest["all"]["date"],
+                           rng=rng, cards=g["cards"], status=g["status"],
+                           oversold=g["oversold"], resonant=g["resonant"],
+                           all_b20=g["a_now"], all_date=g["all_date"],
                            dates=payload["dates"], b5=payload["b5"], b20=payload["b20"],
                            b60=payload["b60"], close=payload["close"],
                            last_date=payload["last_date"],
                            buy_marks=payload["buy_marks"], warn_marks=payload["warn_marks"],
-                           summary=payload["summary"], recent=recent, sig_desc=bt.SIG_DESC)
+                           summary=payload["summary"], recent=g["recent"], sig_desc=bt.SIG_DESC)
 
 
 if __name__ == "__main__":
