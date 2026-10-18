@@ -384,37 +384,72 @@ def youzi():
     return render_template("youzi.html", recs=recs, stats=stats, profile=profile)
 
 
-# ---------------- 页面：市场情绪指标（整体氛围/顶底/拥挤度） ----------------
+# ---------------- 页面：市场情绪指标（复刻复利人生看板版式） ----------------
+
+# 作者公开的尾部分布锚点（复利人生 2026-10-14 文）：P(破净比例 ≥ x)%
+TAIL_PTS = [(8.17, 16.8), (10.0, 8.1), (12.0, 3.9)]
+ZONES = [("冰点 · 极度恐惧", 0, 20, "#2563eb"), ("偏冷 · 恐惧", 20, 40, "#93c5fd"),
+         ("温和 · 中性", 40, 60, "#e5e7eb"), ("偏热 · 贪婪", 60, 80, "#fca5a5"),
+         ("过热 · 极度贪婪", 80, 100.01, "#ef4444")]
+
+
+def tail_pctile(ratio):
+    """P(≥x) 对数线性插值（x≥8.17 有效；更低区间作者未公布，返回 None 待自有样本积累）。"""
+    import math
+    if ratio < TAIL_PTS[0][0]:
+        return None
+    if ratio >= TAIL_PTS[-1][0]:
+        slope = math.log(TAIL_PTS[1][1] / TAIL_PTS[2][1]) / (TAIL_PTS[2][0] - TAIL_PTS[1][0])
+        return max(TAIL_PTS[2][1] * math.exp(slope * (ratio - TAIL_PTS[2][0])), 0.3)
+    for (x0, p0), (x1, p1) in zip(TAIL_PTS, TAIL_PTS[1:]):
+        if x0 <= ratio <= x1:
+            return p0 * math.exp(math.log(p1 / p0) * (ratio - x0) / (x1 - x0))
+
+
+def zone_of(temp):
+    for label, lo, hi, color in ZONES:
+        if lo <= temp < hi:
+            return label, color
+    return ZONES[0][0], ZONES[0][3]
+
 
 @app.route("/mood")
 def mood():
-    """市场情绪指标面板：指标卡 + 破净占比长历史锚点图 + 近期观测 + 口径说明。
+    """破净股与市场情绪温度看板（版式复刻复利人生 kimi 看板）。
 
-    长历史轴=文章锚点（作者口径，引用未复算）；我方观测序列自 2026-10-16 起前向积累。
+    温度=100−尾部分位；尾部分布用作者公开三点（8.17%→83.2分位、10%→91.9、12%→96.1）
+    对数插值近似，待自有观测≥250 日后切换为自有序列分位。蓝色"家数"历史线目前为
+    锚点+前向观测（逐日历史不可廉价回补），随每日采集加密。
     """
-    inds = q("SELECT * FROM mood_indicators WHERE active=1 ORDER BY key")
-    cards = []
-    for r in inds:
-        last = q("SELECT * FROM mood_obs WHERE key=? ORDER BY date DESC LIMIT 1", (r["key"],), one=True)
-        n = q("SELECT COUNT(*) c FROM mood_obs WHERE key=?", (r["key"],), one=True)["c"]
-        p = None
-        if last:
-            vals = [x["value"] for x in q(
-                "SELECT value FROM mood_obs WHERE key=? AND value IS NOT NULL ORDER BY value", (r["key"],))]
-            p = round(sum(1 for v in vals if v <= last["value"]) / len(vals) * 100, 1)
-        cards.append({**r, "last": last, "n": n, "pctile": p,
-                      "enough": n >= 250})
-    obs = q("SELECT * FROM mood_obs WHERE key='net_break_pb' ORDER BY date")
+    last = q("SELECT * FROM mood_obs WHERE key='net_break_pb' ORDER BY date DESC LIMIT 1", one=True)
     anchors = q("SELECT * FROM mood_anchors WHERE key='net_break_pb' ORDER BY date")
-    idx = q("SELECT date,close FROM market_daily WHERE code='000001.SH' ORDER BY date")
-    # 情绪温度：破净占比方向=越高越悲观。温度 0-100（0=极度悲观，100=极度乐观）
-    # 参考作者锚点分布：底 6.8-24.4 / 顶 0-0.63，线性映射 [0,25] -> [100,0]，夹取。
-    temp = None
-    if obs:
-        v = obs[-1]["value"]
-        temp = max(0, min(100, round(100 - v / 25 * 100)))
-    return render_template("mood.html", cards=cards, obs=obs, anchors=anchors,
-                           idx=idx, temp=temp)
+    obs = q("SELECT * FROM mood_obs WHERE key='net_break_pb' ORDER BY date")
+    daily = q("SELECT date,close FROM market_daily WHERE code='000001.SH' ORDER BY date")
+    n_obs = q("SELECT COUNT(*) c FROM mood_obs WHERE key='net_break_pb'", one=True)["c"]
+
+    temp = zone = zcolor = pctile = None
+    narr = "暂无观测。运行 mood-collect 技能采集当日破净截面后，此看板自动点亮。"
+    if last:
+        p_ge = tail_pctile(last["value"])          # P(破净比例≥当前值)%，即“cold 度”
+        pctile = round(100 - p_ge, 1) if p_ge is not None else None   # 历史百分位 P(≤x)
+        temp = round(p_ge) if p_ge is not None else None              # 温度=超越概率
+        zone, zcolor = zone_of(temp) if temp is not None else (None, None)
+        deep = "已跌破" if last["value"] >= 10 else "尚未突破"
+        tail_note = ("高于历史上约 %s%% 的交易日" % pctile) if pctile else "更低价位区间（作者分布未覆盖，分位待积累）"
+        narr = ("当前市场温度 %s°，处于「%s」区间：破净股 %s 家，破净比例 %s%%，%s（作者尾部分布近似，"
+                "自有样本 %d 日积累中）——市场整体估值偏低、投资者情绪偏向恐惧而非贪婪。"
+                "但绝对比例%s 10%% 的深度低估线（2024 年 2 月极端时曾达 16.6%%、850 家），"
+                "属于显著偏冷、接近历史底部区域而未到极端冰点的状态。"
+                % (temp, zone, last["sample_count"], last["value"], tail_note, n_obs, deep)) \
+            if pctile else \
+            ("破净比例 %s%%（%s 家）——该水平低于作者公布分布的覆盖下限（8.17%%），分位与温度待自有样本积累。"
+             % (last["value"], last["sample_count"]))
+
+    ip = ROOT / "data" / "cache" / "mood_index_monthly.json"
+    index_m = json.loads(ip.read_text(encoding="utf-8"))["series"] if ip.exists() else []
+    return render_template("mood.html", last=last, anchors=anchors, obs=obs, daily=daily,
+                           index_m=index_m, temp=temp, zone=zone, zcolor=zcolor,
+                           pctile=pctile, narr=narr, zones=ZONES, n_obs=n_obs)
 
 
 # ---------------- 页面：个股档案（P3） ----------------
