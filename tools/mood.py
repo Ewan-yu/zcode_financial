@@ -13,6 +13,7 @@
   python tools/mood.py add --key net_break_pb --date 2026-10-16 --value 8.17 \
       --count 427 --denom 5224 --source 问财三段 --meta '{"snap":"data/snapshots/20261016/mood_net_break.json"}'
   python tools/mood.py import-edb --file data/snapshots/mood_market_pb.json   # 长序列批量入库
+  python tools/mood.py import-legulegu --file data/snapshots/20261018/mood_legulegu_below_net_asset_m1_20261018.json
   python tools/mood.py anchor-add --key net_break_pb --date 2005-07-11 \
       --label 998历史大底 --value 24.4 --source 复利人生2026-10-14
   python tools/mood.py latest                    # 各指标最新值+动态分位
@@ -28,9 +29,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 PRESETS = [
-    ("net_break_pb", "破净股占比", "情绪/顶底", "%", "问财三段截面(沪深A股)+sector_data家数",
-     "0<PB<1 家数 / 沪深A家数（不含北交所，对齐复利人生作者口径≈5226；净资产为正自动排除资不抵债；含ST；剔除退市整理股；分母=沪深A股家数）",
-     1),  # direction=+1：越高越悲观（底部信号）
+    ("net_break_pb", "破净股占比", "情绪/顶底", "%", "问财三段截面(沪深A股)+乐咕乐股历史日线",
+     "0<PB<1 家数 / 沪深A家数（不含北交所，对齐复利人生作者口径≈5226；净资产为正自动排除资不抵债；含ST；剔除退市整理股；分母=沪深A股家数）"
+     "。历史底座=乐咕乐股日线（import-legulegu，浏览器抓取），日常增量=问财截面（MCP）", 1),  # direction=+1：越高越悲观（底部信号）
     ("market_pb", "全市场市净率", "估值", "倍", "万得EDB M0071672",
      "沪深两市整体市净率（中证指数公司口径，2011-05-03 起）——长期估值背景线；2026-10-18 实测 wind-economic EDB 取数受限（超限），待权限恢复后回补", 0),
 ]
@@ -219,6 +220,53 @@ def cmd_import_wencai(a):
     return 0
 
 
+# ---------------- import-legulegu（乐咕乐股破净日线序列） ----------------
+
+def cmd_import_legulegu(a):
+    """乐咕乐股破净统计浏览器抓取快照 → 逐日批量入库（INSERT OR REPLACE）。
+
+    快照=data/snapshots/<日期>/mood_legulegu_below_net_asset_m1_*.json，由 AI 会话
+    经内置浏览器读取页面 API 后落盘（不走 MCP，属研究性抓取，不进日常采集管线）。
+    value=count/denominator*100；与问财截面同 key 同日期时以本序列覆盖（口径更齐：
+    乐咕 totalCompany≈5226 即沪深A股家数，对齐作者）。
+    """
+    snap = json.loads(Path(a.file).read_text(encoding="utf-8"))
+    rows = snap.get("data") or []
+    if not rows:
+        _out("FAIL 快照无 data 行")
+        return 1
+    try:
+        snap_ref = str(Path(a.file).relative_to(ROOT))
+    except ValueError:
+        snap_ref = a.file
+    conn = connect()
+    inserted, replaced, max_delta = 0, 0, 0.0
+    with conn:
+        for r in rows:
+            date = r.get("date")
+            cnt, denom = r.get("belowNetAsset"), r.get("totalCompany")
+            if not date or cnt is None or denom is None or denom <= 0:
+                continue
+            if a.from_date and date < a.from_date:
+                continue
+            value = round(cnt / denom * 100, 4)
+            old = conn.execute("SELECT value FROM mood_obs WHERE key=? AND date=?",
+                               (a.key, date)).fetchone()
+            if old and old["value"] is not None:
+                replaced += 1
+                max_delta = max(max_delta, abs(old["value"] - value))
+            else:
+                inserted += 1
+            conn.execute("INSERT OR REPLACE INTO mood_obs VALUES (?,?,?,?,?,?,?)",
+                         (a.key, date, value, cnt, denom, a.source,
+                          jdump({"snap": snap_ref})))
+    d0 = next(r["date"] for r in rows if not a.from_date or r["date"] >= a.from_date)
+    n = conn.execute("SELECT COUNT(*) FROM mood_obs WHERE key=?", (a.key,)).fetchone()[0]
+    _out("import-legulegu OK %s：%d 行（%s ~ %s），新增 %d / 覆盖旧值 %d（最大偏差 %.2fpp），现有 %d 条"
+         % (a.key, len(rows), d0, rows[-1]["date"], inserted, replaced, max_delta, n))
+    return 0
+
+
 # ---------------- anchor ----------------
 
 def cmd_anchor_add(a):
@@ -379,6 +427,13 @@ def main(argv=None):
     p.add_argument("--files", required=True, help="问财分段快照，逗号分隔")
     p.add_argument("--denom", type=int, required=True, help="全A家数")
     p.set_defaults(fn=cmd_import_wencai)
+
+    p = sub.add_parser("import-legulegu")
+    p.add_argument("--key", default="net_break_pb")
+    p.add_argument("--file", required=True, help="乐咕破净浏览器抓取快照 JSON")
+    p.add_argument("--source", default="乐咕乐股日线")
+    p.add_argument("--from-date", help="只入库该日期（含）之后")
+    p.set_defaults(fn=cmd_import_legulegu)
 
     p = sub.add_parser("anchor-add")
     p.add_argument("--key", required=True)

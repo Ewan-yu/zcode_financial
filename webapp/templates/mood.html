@@ -44,7 +44,7 @@
     </div>
   </div>
   <div class="ec" id="cMain" style="height:400px"></div>
-  <div style="font-size:12px;color:var(--muted);padding:2px 4px">指数=月线全史（2005 起，wind）+ 逐日（2026-04 起复盘积累）；蓝色家数点=文章锚点 + 我方逐日采集（历史逐日线不可廉价回补，随每日采集自动加密）。</div>
+  <div style="font-size:12px;color:var(--muted);padding:2px 4">指数=月线全史（2005 起，wind）+ 逐日（2026-04 起复盘积累）；蓝色家数=乐咕乐股逐日历史底座（2005 起）+ 前向问财采集逐日加密。</div>
 </div>
 
 <!-- 子图切换 -->
@@ -54,7 +54,7 @@
       <button class="pill active" data-sub="ratio">破净股比例</button>
       <button class="pill" data-sub="pctile">历史百分位</button>
     </div>
-    <div style="font-size:12px;color:var(--muted)">虚线：10% 深度低估参考线</div>
+    <div style="font-size:12px;color:var(--muted)">比例模式虚线：10% 深度低估参考线；百分位=自有序列逐点 expanding 分位</div>
   </div>
   <div class="ec" id="cSub" style="height:220px"></div>
 </div>
@@ -65,36 +65,27 @@
 </style>
 
 <div style="font-size:12px;color:var(--muted);padding:8px 4px">
-  口径：0&lt;PB&lt;1、净资产为正、含ST、剔除退市整理；<b>不含北交所（对齐复利人生作者口径）</b>。
-  2021-11 北交所设立前的历史采样点天然无北交所；其后采样点待按沪深口径重校。温度映射=作者尾部分布
-  三点（8.17%→83.2分位、10%→91.9、12%→96.1）对数插值，自有样本≥250 日后切换自序分位。
+  口径：0&lt;PB&lt;1、净资产为正（PB&lt;0 不纳入）、含ST、剔除退市整理；<b>不含北交所</b>（分母≈5226，对齐复利人生作者口径）。
+  数据来源：<b>乐咕乐股破净股统计逐日历史</b>（2005-01 起，AI 会话经内置浏览器抓取页面接口存档后入库，见
+  data/snapshots/20261018/）+ 问财三段截面日常增量（MCP）。温度与历史百分位=自有序列分位（{{ n_obs }} 日），
+  作者尾部分布三点（8.17%→83.2 分位、10%→91.9、12%→96.1）仅作对照。
   锚点来源：复利人生《如何客观评价市场情绪？介绍一个指标》2026-10-14（引用未复算）。
 </div>
 
 <script>
 const IM = {{ index_m | tojson }}, DAILY = {{ daily | tojson }};
-const ANCHORS = {{ anchors | tojson }}, OBS = {{ obs | tojson }};
+const ANCHORS = {{ anchors | tojson }}, OBS = {{ obs | tojson }}, PCTS = {{ pcts | tojson }};
 const TEMP = {{ temp if temp is not none else 'null' }};
-const TAIL = [[8.17,16.8],[10,8.1],[12,3.9]];   // P(≥x)% 作者尾部分布
-const tailPct = x => {
-  if (x == null || x < TAIL[0][0]) return null;
-  if (x >= TAIL[2][0]) { const s = Math.log(TAIL[1][1]/TAIL[2][1])/(TAIL[2][0]-TAIL[1][0]);
-    return Math.max(TAIL[2][1]*Math.exp(s*(x-TAIL[2][0])), 0.3); }
-  for (let i=0;i<TAIL.length-1;i++){ const [x0,p0]=TAIL[i],[x1,p1]=TAIL[i+1];
-    if (x0<=x && x<=x1) return p0*Math.exp(Math.log(p1/p0)*(x-x0)/(x1-x0)); }
-  return null;
-};
 const tip = {trigger:'axis',backgroundColor:'#fff',borderColor:'#e5e7eb',textStyle:{color:'#374151',fontSize:12},
   axisPointer:{type:'cross',crossStyle:{color:'#999'}}};
 
-// 蓝色家数（锚点有家数者 + 我方观测）与比例（锚点全部 + 观测）——必须按日期排序后渲染
+// 乐咕日线为底座；锚点仅补其未覆盖的日期（同日期以乐咕为准，避免同日双点毛刺）
 const byDate = (a, b) => (a[0] < b[0] ? -1 : 1);
-const cntPts = ANCHORS.filter(a=>a.sample_count!=null).map(a=>[a.date,a.sample_count])
+const obsDates = new Set(OBS.map(o => o.date));
+const A2 = ANCHORS.filter(a => !obsDates.has(a.date));
+const cntPts = A2.filter(a=>a.sample_count!=null).map(a=>[a.date,a.sample_count])
   .concat(OBS.filter(o=>o.sample_count!=null).map(o=>[o.date,o.sample_count])).sort(byDate);
-const ratioPts = ANCHORS.map(a=>[a.date,a.value]).concat(OBS.map(o=>[o.date,o.value])).sort(byDate);
-const pctPts = ANCHORS.concat(OBS).map(p=>({v:p.value, d:p.date}))
-  .sort((a,b)=>a.d<b.d?-1:1).map(p=>{const pc=tailPct(p.v);
-  return pc!=null?[p.d, Math.round((100-pc)*10)/10]:[p.d,null];});
+const ratioPts = A2.map(a=>[a.date,a.value]).concat(OBS.map(o=>[o.date,o.value])).sort(byDate);
 
 function slice(arr, n){ return arr.slice(Math.max(0, arr.length-n)); }
 const RANGES = {
@@ -121,7 +112,8 @@ function drawMain(){
     series:[
       {name:'指数',type:'line',data:idx,yAxisIndex:0,symbol:'none',lineStyle:{color:'#e5484d',width:1.6},
        tooltip:{valueFormatter:v=>v}},
-      {name:'破净股家数',type:'line',data:cnt,yAxisIndex:1,symbol:'circle',symbolSize:5,connectNulls:true,smooth:true,
+      {name:'破净股家数',type:'line',data:cnt,yAxisIndex:1,symbol:cnt.length>400?'none':'circle',symbolSize:5,connectNulls:true,smooth:cnt.length<=400,
+       sampling:'lttb',
        lineStyle:{color:'#3b82f6',width:1.8},itemStyle:{color:'#3b82f6'},
        areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[
          {offset:0,color:'rgba(59,130,246,.22)'},{offset:1,color:'rgba(59,130,246,.02)'}]}},
@@ -132,16 +124,16 @@ function drawSub(){
   if (subChart) subChart.dispose();
   subChart = echarts.init(document.getElementById('cSub'));
   const isPct = curSub==='pctile';
-  const data = isPct ? pctPts : ratioPts;
+  const data = isPct ? PCTS : ratioPts;
   subChart.setOption({
     backgroundColor:'transparent', tooltip:tip, legend:{show:false},
     grid:{left:60,right:30,top:16,bottom:30},
     xAxis:{type:'time',axisLabel:{color:'#6b7280',fontSize:11,hideOverlap:true},axisLine:{lineStyle:{color:'#e5e7eb'}},splitLine:{show:false}},
     yAxis:{type:'value',min:0,axisLabel:{color:'#6b7280',fontSize:11,formatter:'{value}%'},
       splitLine:{lineStyle:{color:'#f3f4f6'}}, max: isPct?100:26},
-    series:[{type:'line',data:data,symbol:'circle',symbolSize:7,connectNulls:true,
-      lineStyle:{color:'#3b82f6',width:1.8,type:data.length>4?'solid':'dashed'},itemStyle:{color:'#3b82f6'},
-      markLine:{silent:true,symbol:'none',lineStyle:{color:'#9ca3af',type:'dashed'},
+    series:[{type:'line',data:data,symbol:'none',connectNulls:true,sampling:'lttb',
+      lineStyle:{color:'#3b82f6',width:1.6,type:data.length>4?'solid':'dashed'},itemStyle:{color:'#3b82f6'},
+      markLine:isPct?undefined:{silent:true,symbol:'none',lineStyle:{color:'#9ca3af',type:'dashed'},
         data:[{yAxis:10,label:{formatter:'10% 深度低估线',color:'#6b7280',fontSize:11,position:'insideEndTop'}}]},
       tooltip:{valueFormatter:v=>isPct?v+' 分位':v+'%'}}]});
 }

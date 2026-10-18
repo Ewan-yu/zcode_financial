@@ -417,39 +417,51 @@ def zone_of(temp):
 def mood():
     """破净股与市场情绪温度看板（版式复刻复利人生 kimi 看板）。
 
-    温度=100−尾部分位；尾部分布用作者公开三点（8.17%→83.2分位、10%→91.9、12%→96.1）
-    对数插值近似，待自有观测≥250 日后切换为自有序列分位。蓝色"家数"历史线目前为
-    锚点+前向观测（逐日历史不可廉价回补），随每日采集加密。
+    历史底座=乐咕乐股逐日日线（2005 起，浏览器抓取存档后 import-legulegu 入库，
+    沪深口径 totalCompany≈5226 对齐作者），日常增量=问财三段截面（MCP）。
+    自有序列≥250 日后温度与历史百分位改用自有分位（当前约 5272 日），作者尾部分布
+    三点仅作对照备注；子图百分位为逐点 expanding 分位（累计不足 120 日为空）。
     """
-    last = q("SELECT * FROM mood_obs WHERE key='net_break_pb' ORDER BY date DESC LIMIT 1", one=True)
-    anchors = q("SELECT * FROM mood_anchors WHERE key='net_break_pb' ORDER BY date")
-    obs = q("SELECT * FROM mood_obs WHERE key='net_break_pb' ORDER BY date")
+    import bisect
+    last = q("SELECT date,value,sample_count,denominator FROM mood_obs WHERE key='net_break_pb' ORDER BY date DESC LIMIT 1", one=True)
+    anchors = q("SELECT date,label,value,sample_count FROM mood_anchors WHERE key='net_break_pb' ORDER BY date")
+    obs = q("SELECT date,value,sample_count,denominator FROM mood_obs WHERE key='net_break_pb' ORDER BY date")
     daily = q("SELECT date,close FROM market_daily WHERE code='000001.SH' ORDER BY date")
-    n_obs = q("SELECT COUNT(*) c FROM mood_obs WHERE key='net_break_pb'", one=True)["c"]
+    n_obs = len(obs)
+
+    # 逐点 expanding 分位（子图用）：累计样本≥120 日才出值
+    pcts, window = [], []
+    for o in obs:
+        v = o["value"]
+        if v is None:
+            pcts.append([o["date"], None])
+            continue
+        bisect.insort(window, v)
+        pcts.append([o["date"], round(bisect.bisect_right(window, v) / len(window) * 100, 1)
+                     if len(window) >= 120 else None])
 
     temp = zone = zcolor = pctile = None
     narr = "暂无观测。运行 mood-collect 技能采集当日破净截面后，此看板自动点亮。"
-    if last:
-        p_ge = tail_pctile(last["value"])          # P(破净比例≥当前值)%，即“cold 度”
-        pctile = round(100 - p_ge, 1) if p_ge is not None else None   # 历史百分位 P(≤x)
-        temp = round(p_ge) if p_ge is not None else None              # 温度=超越概率
-        zone, zcolor = zone_of(temp) if temp is not None else (None, None)
-        deep = "已跌破" if last["value"] >= 10 else "尚未突破"
-        tail_note = ("高于历史上约 %s%% 的交易日" % pctile) if pctile else "更低价位区间（作者分布未覆盖，分位待积累）"
-        narr = ("当前市场温度 %s°，处于「%s」区间：破净股 %s 家，破净比例 %s%%，%s（作者尾部分布近似，"
-                "自有样本 %d 日积累中）——市场整体估值偏低、投资者情绪偏向恐惧而非贪婪。"
-                "但绝对比例%s 10%% 的深度低估线（2024 年 2 月极端时曾达 16.6%%、850 家），"
-                "属于显著偏冷、接近历史底部区域而未到极端冰点的状态。"
-                % (temp, zone, last["sample_count"], last["value"], tail_note, n_obs, deep)) \
-            if pctile else \
-            ("破净比例 %s%%（%s 家）——该水平低于作者公布分布的覆盖下限（8.17%%），分位与温度待自有样本积累。"
-             % (last["value"], last["sample_count"]))
+    if last and n_obs:
+        vals = sorted(o["value"] for o in obs if o["value"] is not None)
+        pctile = round(bisect.bisect_right(vals, last["value"]) / len(vals) * 100, 1)
+        temp = round(100 - pctile)                    # 温度=超越概率（越低越冰点）
+        zone, zcolor = zone_of(temp)
+        a_ge = tail_pctile(last["value"])
+        a_txt = ("作者尾部分布模型 %s°/百分位 %.1f%%" % (round(a_ge), 100 - a_ge)) \
+            if a_ge is not None else "作者公布分布未覆盖该水平"
+        narr = ("当前破净比例 %s%%（%s 家，%s），处于自有 %d 日序列的 %.1f%% 历史分位——"
+                "市场温度 %s°，情绪显著偏冷、接近历史底部区域而未到极端冰点（%s）。"
+                "历史上该比例突破 10%% 即进入深度低估区：2024-02-07 极端时曾达 16.64%%/850 家，"
+                "2005 年 998 点区域最高 24.4%%。"
+                % (last["value"], last["sample_count"], last["date"], n_obs, pctile,
+                   temp, a_txt))
 
     ip = ROOT / "data" / "cache" / "mood_index_monthly.json"
     index_m = json.loads(ip.read_text(encoding="utf-8"))["series"] if ip.exists() else []
     return render_template("mood.html", last=last, anchors=anchors, obs=obs, daily=daily,
                            index_m=index_m, temp=temp, zone=zone, zcolor=zcolor,
-                           pctile=pctile, narr=narr, zones=ZONES, n_obs=n_obs)
+                           pctile=pctile, narr=narr, zones=ZONES, n_obs=n_obs, pcts=pcts)
 
 
 # ---------------- 页面：个股档案（P3） ----------------
