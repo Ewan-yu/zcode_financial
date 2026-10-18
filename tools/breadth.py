@@ -152,7 +152,7 @@ def cmd_check(a):
         rows = conn.execute("SELECT date,b20,b60,close FROM breadth_daily WHERE code=? ORDER BY date", (c,)).fetchall()
         dates = [r["date"] for r in rows]
         date_sets[c] = set(dates)
-        rng = [conn.execute("SELECT MIN(date),MAX(date) FROM breadth_daily WHERE code=?", (c,)).fetchone()]
+        rng = conn.execute("SELECT MIN(date),MAX(date) FROM breadth_daily WHERE code=?", (c,)).fetchone()
         bad_rng = conn.execute(
             "SELECT COUNT(*) FROM breadth_daily WHERE code=? AND (b20<0 OR b20>100 OR b60<0 OR b60>100)", (c,)
         ).fetchone()[0]
@@ -160,29 +160,44 @@ def cmd_check(a):
         zeros = conn.execute(
             "SELECT COUNT(*) FROM breadth_daily WHERE code=? AND (b20=0 OR b60=0)", (c,)).fetchone()[0]
         info.append("%-8s %d 行 %s~%s b20空%d 精确0=%d 值域违例%d"
-                    % (c, len(rows), rng[0][0], rng[0][1], null20, zeros, bad_rng))
+                    % (c, len(rows), rng[0], rng[1], null20, zeros, bad_rng))
         if bad_rng:
             ok = False
-    _out("口径行数：" + "；".join(info))
-    ref = date_sets.get(codes[0]) if codes else set()
-    for c, ds in date_sets.items():
-        if ds != ref:
-            ok = False
-            _out("FAIL 口径 %s 日期集与 %s 不一致（差 %d 天）" % (c, codes[0], len(ds ^ ref)))
-    # 对齐 market_daily 交易日（以上证为历）
+    _out("口径行数（起点=各指数发布日，不同属正常）：" + "；".join(info))
+    # 跨口径一致性：只比对共同覆盖区间（max(起点)~min(终点)）内日期集；≤3 天差异=源数据
+    # 单日缺行（如乐咕 all 缺 2022-07-13，小盘序列有），列 WARN 不拦截
+    if len(date_sets) > 1:
+        lo = max(min(ds) for ds in date_sets.values())
+        hi = min(max(ds) for ds in date_sets.values())
+        ref_c = sorted(date_sets, key=lambda c: -len(date_sets[c]))[0]
+        ref = {d for d in date_sets[ref_c] if lo <= d <= hi}
+        hard = False
+        for c, ds in date_sets.items():
+            sub = {d for d in ds if lo <= d <= hi}
+            diff = sorted(sub ^ ref)
+            if not diff:
+                continue
+            if len(diff) <= 3:
+                _out("WARN 口径 %s 与 %s 在共同区间差 %d 天：%s（源单日缺行，可容忍）"
+                     % (c, ref_c, len(diff), ",".join(diff)))
+            else:
+                hard = True
+                ok = False
+                _out("FAIL 口径 %s 在共同区间 %s~%s 与 %s 日期集不一致（差 %d 天）"
+                     % (c, lo, hi, ref_c, len(diff)))
+        if not hard:
+            _out("跨口径共同区间 %s~%s：以 %s 为参照核验一致（含可容忍差异）" % (lo, hi, ref_c))
+    # 对齐 market_daily 交易日历：只核对该表覆盖区间内
     try:
         cal = {r["date"] for r in conn.execute(
             "SELECT DISTINCT date FROM market_daily WHERE code='000001.SH'")}
-        lo = min(min(ds) for ds in date_sets.values())
-        hi = max(max(ds) for ds in date_sets.values())
-        overlap = {d for d in ref if lo <= d <= hi}
-        missing = sorted(overlap - cal)
-        extra = sorted(d for d in cal if lo <= d <= hi) and sorted(set(d for d in cal if lo <= d <= hi) - overlap)
-        _out("交易日历对齐（%s~%s）：缺口 %d 天%s；上证有而广度缺 %d 天"
-             % (lo, hi, len(missing), ("：" + ",".join(missing[:8]) if missing else ""),
-                len(extra) if extra else 0))
-        if missing:
-            ok = False
+        if cal:
+            lo, hi = min(cal), max(cal)
+            miss = sorted({d for ds in date_sets.values() for d in ds if lo <= d <= hi} - cal)
+            _out("交易日历对齐（%s~%s，market_daily 覆盖段）：广度侧多出 %d 天%s"
+                 % (lo, hi, len(miss), ("：" + ",".join(miss[:8]) if miss else "")))
+            if miss:
+                ok = False
     except sqlite3.OperationalError:
         _out("WARN market_daily 表不存在，跳过交易日历对齐")
     _out("check: %s" % ("PASS" if ok else "FAIL"))

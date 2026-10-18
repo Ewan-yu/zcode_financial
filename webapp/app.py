@@ -618,6 +618,9 @@ def breadth():
             cards.append({"code": c, "name": nm, **L, "badge": badge, "bclass": bclass,
                           "sigs": sigs, "pos": pos})
 
+        # 头部摘要：全A 单独展示，超卖区列表排除全A（避免重复，对齐作者版式）
+        oversold = [n for n in oversold if n != "全A"]
+
         payload = _bd_chart_payload(conn, code_sel, rng)
         # 近期事件表（全口径混合，近 40 条）
         recent = []

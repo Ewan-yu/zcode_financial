@@ -9,7 +9,7 @@
 <!-- 头部状态卡（作者版式） -->
 <div class="chart span12" style="padding:16px 22px">
   <div style="font-size:14.5px;margin-bottom:10px">
-    全A广度 <b>{{ all_b20 if all_b20 is not none else '—' }}%</b>（{{ all_date }}，乐咕滞后 15 个交易日），
+    全A广度 <b>{{ all_b20 if all_b20 is not none else '—' }}%</b>（{{ all_date }}），
     市场状态：<b>{{ status }}</b>；超卖区：{{ oversold|join('、') or '—' }}
   </div>
   {% for r in resonant %}
@@ -27,7 +27,7 @@
       {{ 'background:#d1fae5;color:#059669' if cls=='b' else ('background:#fef3c7;color:#b45309' if cls=='y' else ('background:#fee2e2;color:#dc2626' if cls=='r' else 'background:#f3f4f6;color:#6b7280')) }}">{{ sig_desc[sid] }}</span>
     {% endfor %}
   </div>
-  <p style="font-size:12px;color:#9ca3af;margin:8px 0 0">S10/S11 背离=暂定口径（作者自标）；THR 推力与状态阈值为我方发明参数；仓位建议=作者卡片规则复刻，不构成投资建议。</p>
+  <p style="font-size:12px;color:#9ca3af;margin:8px 0 0">数据为乐咕登录态全量（2005 起，尾部无缺；若登录失效自动降级为匿名档：近 4 年+尾部约 15 日缺值，届时问财补尾）。S10/S11 背离=暂定口径（作者自标）；THR 推力与状态阈值为我方发明参数；仓位建议=作者卡片规则复刻，不构成投资建议。</p>
 </div>
 
 <!-- 八口径卡片（作者版式：大字+渐变条+MA5/60+触发+仓位建议） -->
