@@ -267,6 +267,44 @@ def cmd_import_legulegu(a):
     return 0
 
 
+# ---------------- import-spread（乐咕股债利差序列） ----------------
+
+def cmd_import_spread(a):
+    """乐咕股债利差快照 → mood_obs（value=peSpread×100 即百分数）。
+    meta 存通道列（avg/std/upper=avg+2σ/lower=avg−2σ，百分数口径，≈605日滚动，
+    与作者看板通道同源）+ 沪深300收盘 + 隐含PE(=100/利差)。"""
+    snap = json.loads(Path(a.file).read_text(encoding="utf-8"))
+    rows = snap.get("data") or []
+    if not rows:
+        _out("FAIL 快照无 data 行")
+        return 1
+    try:
+        snap_ref = str(Path(a.file).relative_to(ROOT))
+    except ValueError:
+        snap_ref = a.file
+    conn = connect()
+    n = 0
+    with conn:
+        for r in rows:
+            date, pe = r.get("date"), r.get("peSpread")
+            if not date or pe is None:
+                continue
+            avg, std = r.get("peSpreadAverage"), r.get("peSpreadStandardDeviation")
+            meta = {"snap": snap_ref, "close": r.get("close"), "dv_spread": r.get("dvSpread")}
+            if avg is not None and std is not None:
+                meta.update({"avg": round(avg * 100, 4), "std": round(std * 100, 4),
+                             "upper": round((avg + 2 * std) * 100, 4),
+                             "lower": round((avg - 2 * std) * 100, 4)})
+            if pe:
+                meta["pe_implied"] = round(100 / pe, 2)
+            conn.execute("INSERT OR REPLACE INTO mood_obs VALUES (?,?,?,?,?,?,?)",
+                         (a.key, date, round(pe * 100, 4), None, None,
+                          a.source or "乐咕乐股", jdump(meta)))
+            n += 1
+    _out("import-spread OK %s：%d 行（%s ~ %s）" % (a.key, n, rows[0]["date"], rows[-1]["date"]))
+    return 0
+
+
 # ---------------- anchor ----------------
 
 def cmd_anchor_add(a):
@@ -434,6 +472,12 @@ def main(argv=None):
     p.add_argument("--source", default="乐咕乐股日线")
     p.add_argument("--from-date", help="只入库该日期（含）之后")
     p.set_defaults(fn=cmd_import_legulegu)
+
+    p = sub.add_parser("import-spread")
+    p.add_argument("--key", default="eq_bd_spread")
+    p.add_argument("--file", required=True, help="乐咕股债利差快照 JSON")
+    p.add_argument("--source", default="乐咕乐股equity-bond-spread")
+    p.set_defaults(fn=cmd_import_spread)
 
     p = sub.add_parser("anchor-add")
     p.add_argument("--key", required=True)

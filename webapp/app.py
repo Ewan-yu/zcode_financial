@@ -457,11 +457,41 @@ def mood():
                 % (last["value"], last["sample_count"], last["date"], n_obs, pctile,
                    temp, a_txt))
 
+    # ---- 股债利差·市场温度（SRC-FRL-03，XC-J-004/XC-R-006；温度公式=作者看板反推） ----
+    spread = None
+    srows = q("SELECT date,value,meta FROM mood_obs WHERE key='eq_bd_spread' ORDER BY date")
+    if srows:
+        spts = []
+        for r in srows:
+            if r["value"] is None:
+                continue
+            m = json.loads(r["meta"]) if r["meta"] else {}
+            spts.append({"date": r["date"], "v": r["value"], "avg": m.get("avg"),
+                         "upper": m.get("upper"), "lower": m.get("lower"), "close": m.get("close")})
+        s_last = spts[-1] if spts else None
+        if s_last and s_last["upper"] and s_last["lower"] and s_last["upper"] > s_last["lower"]:
+            temp_s = round(max(0.0, min(100.0, (s_last["upper"] - s_last["v"]) / (s_last["upper"] - s_last["lower"]) * 100)))
+            sigma = (s_last["upper"] - s_last["lower"]) / 4
+            dev = round((s_last["v"] - s_last["avg"]) / sigma, 2) if sigma else None
+            if dev is None or abs(dev) <= 1:
+                sig = "正常区间"
+                narr_s = "股债利差在均线 ±1 倍标准差内运行，股债性价比处于常态水平。"
+            elif dev > 1:
+                sig = "低估区（利差 > +1σ）"
+                narr_s = "利差高于均线 +1σ，股票相对债券显著便宜——历史上该区域多对应底部区域。"
+            else:
+                sig = "高估区（利差 < −1σ）"
+                narr_s = "利差低于均线 −1σ，股票相对债券偏贵——历史上该区域多对应顶部区域。"
+            spread = {"temp": temp_s, "v": s_last["v"], "close": s_last["close"], "dev": dev,
+                      "avg": s_last["avg"], "upper": s_last["upper"], "lower": s_last["lower"],
+                      "sig": sig, "narr": narr_s, "date": s_last["date"], "pts": spts}
+
     ip = ROOT / "data" / "cache" / "mood_index_monthly.json"
     index_m = json.loads(ip.read_text(encoding="utf-8"))["series"] if ip.exists() else []
     return render_template("mood.html", last=last, anchors=anchors, obs=obs, daily=daily,
                            index_m=index_m, temp=temp, zone=zone, zcolor=zcolor,
-                           pctile=pctile, narr=narr, zones=ZONES, n_obs=n_obs, pcts=pcts)
+                           pctile=pctile, narr=narr, zones=ZONES, n_obs=n_obs, pcts=pcts,
+                           spread=spread)
 
 
 # ---------------- 页面：个股档案（P3） ----------------

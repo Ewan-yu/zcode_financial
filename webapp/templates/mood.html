@@ -59,6 +59,42 @@
   <div class="ec" id="cSub" style="height:220px"></div>
 </div>
 
+{% if spread %}
+<!-- 股债利差·市场温度（复利人生公众号 SRC-FRL-03，XC-J-004/XC-R-006；复刻作者 kimi 看板） -->
+<div class="chart span12" style="padding:16px 22px;margin-top:10px">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <h3 style="margin:0;font-size:16px;color:#1f2937">股债利差 · 市场温度</h3>
+    <span style="font-size:12.5px;border-radius:10px;padding:3px 12px;font-weight:600;{{ 'background:#d1fae5;color:#059669' if '低估' in spread.sig else ('background:#fee2e2;color:#dc2626' if '高估' in spread.sig else 'background:#f3f4f6;color:#6b7280') }}">{{ spread.sig }}</span>
+  </div>
+  <div style="font-size:12px;color:var(--muted);margin-top:2px">截至 {{ spread.date }} · 沪深300：盈利收益率(1/PE)−10年国债 · 乐咕 equity-bond-spread</div>
+  <div style="display:flex;gap:44px;align-items:flex-end;flex-wrap:wrap;margin:16px 0 8px">
+    <div><div style="font-size:12px;color:var(--muted)">市场温度</div>
+      <div style="font-size:46px;font-weight:800;line-height:1.15;color:#1f2937">{{ spread.temp }}°</div>
+      <div style="font-size:12px;color:var(--muted)">0 冰冷(底部) · 100 过热(顶部)</div></div>
+    <div><div style="font-size:12px;color:var(--muted)">股债利差</div>
+      <div style="font-size:27px;font-weight:700;color:#1f2937">{{ spread.v }}%</div>
+      <div style="font-size:12px;color:var(--muted)">通道 {{ spread.lower }}% ~ {{ spread.upper }}%</div></div>
+    <div><div style="font-size:12px;color:var(--muted)">沪深300</div>
+      <div style="font-size:27px;font-weight:700;color:#1f2937">{{ '%.2f'|format(spread.close) if spread.close else '—' }}</div>
+      <div style="font-size:12px;color:var(--muted)">偏离均线 {{ '%+.2f'|format(spread.dev) }}σ</div></div>
+  </div>
+  <div style="position:relative;height:12px;border-radius:7px;margin:6px 0 4px;
+    background:linear-gradient(90deg,#93c5fd 0%,#dbeafe 18%,#f3f4f6 40%,#f3f4f6 60%,#fecaca 82%,#f87171 100%)">
+    <div style="position:absolute;left:{{ spread.temp }}%;top:-4px;width:3px;height:20px;background:#111827;border-radius:2px"></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;font-size:11.5px;color:#9ca3af">
+    <span>底部区域</span><span>正常区间</span><span>顶部区域</span>
+  </div>
+  <p style="font-size:13.5px;color:#374151;margin:10px 0 0">{{ spread.narr }}（利差越高=股票越便宜=温度越低；温度=通道内位置的线性映射，作者口径 XC-R-006）。</p>
+</div>
+<div class="chart span12" style="margin-top:0">
+  <div style="font-size:12px;color:var(--muted);padding:4px 4px 0">
+    <span style="color:#2563eb">━</span> 股债利差（左轴）　<span style="color:#dc2626">━</span> 沪深300（右轴）　<span style="color:#374151">━</span> 利差均线　┄ ±2σ 通道（≈605 日滚动，端点自带）
+  </div>
+  <div class="ec" id="cSpread" style="height:420px"></div>
+</div>
+{% endif %}
+
 <style>
 .pill{border:1px solid #e5e7eb;background:transparent;color:#6b7280;border-radius:16px;padding:4px 14px;font-size:12px;cursor:pointer}
 .pill.active{background:#e5e7eb;color:#111827;border-color:#e5e7eb;font-weight:600}
@@ -94,7 +130,7 @@ const RANGES = {
   y5:  IM.filter(r=>r[0]>='2021-10').map(r=>[r[0], r[1]]),
   y1:  DAILY.map(r=>[r.date, r.close])
 };
-let mainChart=null, subChart=null, curRange='all', curSub='ratio';
+let mainChart=null, subChart=null, spreadChart=null, curRange='all', curSub='ratio';
 
 function drawMain(){
   const idx = RANGES[curRange];
@@ -143,7 +179,45 @@ document.querySelectorAll('#rangePills .pill').forEach(b=>b.onclick=()=>{
 document.querySelectorAll('#subPills .pill').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('#subPills .pill').forEach(x=>x.classList.remove('active'));
   b.classList.add('active'); curSub=b.dataset.sub; drawSub();});
-window.addEventListener('resize',()=>{mainChart&&mainChart.resize();subChart&&subChart.resize();});
+window.addEventListener('resize',()=>{mainChart&&mainChart.resize();subChart&&subChart.resize();spreadChart&&spreadChart.resize();});
 drawMain(); drawSub();
+{% if spread %}
+const SP = {{ spread.pts | tojson }};
+(function(){
+  if (typeof echarts === 'undefined' || !SP.length) return;
+  spreadChart = echarts.init(document.getElementById('cSpread'));
+  const ax = {color:'#6b7280',fontSize:10.5};
+  const dates = SP.map(p=>p.date);
+  spreadChart.setOption({
+    backgroundColor:'transparent',
+    tooltip:{trigger:'axis',backgroundColor:'#fff',borderColor:'#e5e7eb',textStyle:{color:'#374151',fontSize:12},
+      axisPointer:{type:'cross',crossStyle:{color:'#999'}}},
+    legend:{show:false}, grid:{left:56,right:62,top:24,bottom:30},
+    xAxis:{type:'category',data:dates,axisLabel:{...ax,hideOverlap:true,formatter:v=>v.slice(0,7)},
+      axisLine:{lineStyle:{color:'#e5e7eb'}},splitLine:{show:false}},
+    yAxis:[
+      {type:'value',scale:true,axisLabel:{...ax,formatter:v=>(v*1).toFixed(0)+'%'},splitLine:{lineStyle:{color:'#f3f4f6'}}},
+      {type:'value',scale:true,axisLabel:{...ax,formatter:v=>Math.round(v).toLocaleString()},splitLine:{show:false}}],
+    series:[
+      {name:'沪深300',type:'line',data:SP.map(p=>p.close),yAxisIndex:1,symbol:'none',sampling:'lttb',
+       lineStyle:{color:'#dc2626',width:1.2}},
+      {name:'股债利差',type:'line',data:SP.map(p=>p.v),symbol:'none',sampling:'lttb',connectNulls:true,
+       lineStyle:{color:'#2563eb',width:1.7},
+       markLine:{silent:true,symbol:'none',
+         lineStyle:{color:'#d1d5db',type:'dashed'},
+         data:[{yAxis:SP[SP.length-1].upper,lineStyle:{color:'#d1d5db',type:'dashed'},label:{show:false}},
+               {yAxis:SP[SP.length-1].avg,lineStyle:{color:'#374151',type:'solid',width:1.2},
+                label:{formatter:'均线',color:'#6b7280',fontSize:10,position:'insideEndTop'}},
+               {yAxis:SP[SP.length-1].lower,lineStyle:{color:'#d1d5db',type:'dashed'},label:{show:false}}]}},
+      {name:'+2σ',type:'line',data:SP.map(p=>p.upper),symbol:'none',sampling:'lttb',connectNulls:true,
+       lineStyle:{color:'#9ca3af',width:1,type:'dashed'},tooltip:{show:false}},
+      {name:'−2σ',type:'line',data:SP.map(p=>p.lower),symbol:'none',sampling:'lttb',connectNulls:true,
+       lineStyle:{color:'#9ca3af',width:1,type:'dashed'},tooltip:{show:false}},
+      {name:'均线',type:'line',data:SP.map(p=>p.avg),symbol:'none',sampling:'lttb',connectNulls:true,
+       lineStyle:{color:'#374151',width:1.3},tooltip:{show:false}}
+    ]});
+  window.addEventListener('resize',()=>spreadChart.resize());
+})();
+{% endif %}
 </script>
 {% endblock %}
