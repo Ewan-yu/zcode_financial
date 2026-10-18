@@ -43,3 +43,6 @@ Thumbs.db
 .DS_Store
 data/entries.json
 data/youzi_profile.json
+
+# webapp 运行日志
+data/webapp.log
