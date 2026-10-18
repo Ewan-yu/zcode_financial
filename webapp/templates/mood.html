@@ -85,7 +85,15 @@
   <div style="display:flex;justify-content:space-between;font-size:11.5px;color:#9ca3af">
     <span>底部区域</span><span>正常区间</span><span>顶部区域</span>
   </div>
-  <p style="font-size:13.5px;color:#374151;margin:10px 0 0">{{ spread.narr }}（利差越高=股票越便宜=温度越低；温度=通道内位置的线性映射，作者口径 XC-R-006）。</p>
+  <p style="font-size:13.5px;color:#374151;margin:10px 0 0">{{ spread.narr }}（利差越高=股票越便宜=温度越低；温度=通道内位置的线性映射，作者口径）。</p>
+  <div style="border:1px solid #e3e7ee;background:#f9fafb;border-radius:8px;padding:10px 14px;margin-top:12px;font-size:12.8px;color:#374151;line-height:1.95">
+    <b style="color:#1f2937">怎么用这个指标：</b>
+    ① <b>定位</b>——只判<b>历史大顶大底</b>（几年一次），不用于短线买卖点；
+    ② <b>防大错</b>——利差触<b>上轨（+2σ）</b>=股票相对债券罕见便宜，历史上多对应大底（2005/2008/2013/2014/2019/2022/2024），是分批加仓的信号区；跌穿<b>下轨（−2σ）</b>=罕见昂贵（2007/2015/2021 大顶），是控制仓位的警报；
+    ③ <b>仓位管理</b>——常态区（±1σ 内）维持基准仓位，利差越高仓位越高、越低仓位越低；
+    ④ <b>互相印证</b>——与破净股占比（本页上方）、市场广度（/breadth 页）三者同向时信号权重最高。
+    ⚠ 注意：国债利率长期下行会让利差整体抬高，<b>看通道位置、勿背绝对数值</b>。历史顶底列表来源：复利人生公众号 2026-10-13 文（存档 knowledge/raw/）。
+  </div>
 </div>
 <div class="chart span12" style="margin-top:0">
   <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 4px 0;flex-wrap:wrap;gap:6px">
@@ -181,12 +189,19 @@ function drawSub(){
         data:[{yAxis:10,label:{formatter:'10% 深度低估线',color:'#6b7280',fontSize:11,position:'insideEndTop'}}]},
       tooltip:{valueFormatter:v=>isPct?v+' 分位':v+'%'}}]});
 }
+// 视图状态持久化：刷新后恢复上次的窗口/子图选择（内嵌浏览器不支持 replaceState，改用 localStorage）
+const savedView = (() => { try { return JSON.parse(localStorage.getItem('mood_view') || '{}'); } catch (e) { return {}; } })();
+function saveView() { try { localStorage.setItem('mood_view', JSON.stringify({ main: curRange, sub: curSub, spr: window.__spRange || 'all' })); } catch (e) {} }
+curRange = savedView.main || curRange;
+curSub = savedView.sub || curSub;
+document.querySelectorAll('#rangePills .pill').forEach(b => b.classList.toggle('active', b.dataset.range === curRange));
+document.querySelectorAll('#subPills .pill').forEach(b => b.classList.toggle('active', b.dataset.sub === curSub));
 document.querySelectorAll('#rangePills .pill').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('#rangePills .pill').forEach(x=>x.classList.remove('active'));
-  b.classList.add('active'); curRange=b.dataset.range; drawMain();});
+  b.classList.add('active'); curRange=b.dataset.range; drawMain(); saveView();});
 document.querySelectorAll('#subPills .pill').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('#subPills .pill').forEach(x=>x.classList.remove('active'));
-  b.classList.add('active'); curSub=b.dataset.sub; drawSub();});
+  b.classList.add('active'); curSub=b.dataset.sub; drawSub(); saveView();});
 window.addEventListener('resize',()=>{mainChart&&mainChart.resize();subChart&&subChart.resize();spreadChart&&spreadChart.resize();});
 drawMain(); drawSub();
 {% if spread %}
@@ -195,7 +210,9 @@ const SP = {{ spread.pts | tojson }};
   if (typeof echarts === 'undefined' || !SP.length) return;
   spreadChart = echarts.init(document.getElementById('cSpread'));
   const ax = {color:'#6b7280',fontSize:10.5};
-  let spRange = 'all';
+  let spRange = savedView.spr || 'all';
+  window.__spRange = spRange;
+  document.querySelectorAll('[data-spr]').forEach(b => b.classList.toggle('active', b.dataset.spr === spRange));
   function drawSpread() {
     const cut = spRange === 'y10' ? '2016-10-16' : spRange === 'y5' ? '2021-10-16' : '';
     const S = cut ? SP.filter(p => p.date >= cut) : SP;
@@ -231,7 +248,7 @@ const SP = {{ spread.pts | tojson }};
   drawSpread();
   document.querySelectorAll('[data-spr]').forEach(b => b.addEventListener('click', () => {
     document.querySelectorAll('[data-spr]').forEach(x => x.classList.remove('active'));
-    b.classList.add('active'); spRange = b.dataset.spr; drawSpread();
+    b.classList.add('active'); spRange = b.dataset.spr; window.__spRange = spRange; drawSpread(); saveView();
   }));
   window.addEventListener('resize',()=>spreadChart.resize());
 })();
