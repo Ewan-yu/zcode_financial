@@ -142,6 +142,18 @@ CREATE TABLE IF NOT EXISTS youzi_picks (
 CREATE TABLE IF NOT EXISTS macro (
   code TEXT, date TEXT, value REAL, PRIMARY KEY(code, date)
 );
+CREATE TABLE IF NOT EXISTS mood_indicators (
+  key TEXT PRIMARY KEY, name TEXT, domain TEXT, unit TEXT, source TEXT,
+  method TEXT, direction INT DEFAULT 0, active INT DEFAULT 1, created_at TEXT
+);
+CREATE TABLE IF NOT EXISTS mood_obs (
+  key TEXT, date TEXT, value REAL, sample_count INT, denominator INT,
+  source TEXT, meta TEXT, PRIMARY KEY(key, date)
+);
+CREATE TABLE IF NOT EXISTS mood_anchors (
+  key TEXT, date TEXT, label TEXT, value REAL, sample_count INT,
+  source TEXT, verified TEXT, PRIMARY KEY(key, date, label)
+);
 """
 
 PRESET_POOLS = [
@@ -210,7 +222,7 @@ def cmd_init(a):
         for key, title, domain, source, desc in PRESET_POOLS:
             conn.execute("INSERT OR IGNORE INTO pools VALUES (?,?,?,?,?,?,1)",
                          (key, title, domain, source, desc, today()))
-        conn.execute("INSERT OR REPLACE INTO schema_version VALUES (1, ?)", (today(),))
+        conn.execute("INSERT OR REPLACE INTO schema_version VALUES (2, ?)", (today(),))
     _out("init OK -> %s（预置池：%s）" % (db_path(), ", ".join(p[0] for p in PRESET_POOLS)))
 
 

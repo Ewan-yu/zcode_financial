@@ -384,6 +384,39 @@ def youzi():
     return render_template("youzi.html", recs=recs, stats=stats, profile=profile)
 
 
+# ---------------- 页面：市场情绪指标（整体氛围/顶底/拥挤度） ----------------
+
+@app.route("/mood")
+def mood():
+    """市场情绪指标面板：指标卡 + 破净占比长历史锚点图 + 近期观测 + 口径说明。
+
+    长历史轴=文章锚点（作者口径，引用未复算）；我方观测序列自 2026-10-16 起前向积累。
+    """
+    inds = q("SELECT * FROM mood_indicators WHERE active=1 ORDER BY key")
+    cards = []
+    for r in inds:
+        last = q("SELECT * FROM mood_obs WHERE key=? ORDER BY date DESC LIMIT 1", (r["key"],), one=True)
+        n = q("SELECT COUNT(*) c FROM mood_obs WHERE key=?", (r["key"],), one=True)["c"]
+        p = None
+        if last:
+            vals = [x["value"] for x in q(
+                "SELECT value FROM mood_obs WHERE key=? AND value IS NOT NULL ORDER BY value", (r["key"],))]
+            p = round(sum(1 for v in vals if v <= last["value"]) / len(vals) * 100, 1)
+        cards.append({**r, "last": last, "n": n, "pctile": p,
+                      "enough": n >= 250})
+    obs = q("SELECT * FROM mood_obs WHERE key='net_break_pb' ORDER BY date")
+    anchors = q("SELECT * FROM mood_anchors WHERE key='net_break_pb' ORDER BY date")
+    idx = q("SELECT date,close FROM market_daily WHERE code='000001.SH' ORDER BY date")
+    # 情绪温度：破净占比方向=越高越悲观。温度 0-100（0=极度悲观，100=极度乐观）
+    # 参考作者锚点分布：底 6.8-24.4 / 顶 0-0.63，线性映射 [0,25] -> [100,0]，夹取。
+    temp = None
+    if obs:
+        v = obs[-1]["value"]
+        temp = max(0, min(100, round(100 - v / 25 * 100)))
+    return render_template("mood.html", cards=cards, obs=obs, anchors=anchors,
+                           idx=idx, temp=temp)
+
+
 # ---------------- 页面：个股档案（P3） ----------------
 
 @app.route("/stock/<code>")

@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}市场情绪 · 复盘工作台{% endblock %}
+{% block content %}
+<header class="page"><h1>市场情绪指标</h1><span class="date">整体市场氛围 / 顶底 / 拥挤度参考 · 非短线专用（模块 B / TR / DT 共用背景板）</span></header>
+<div class="note">系列来源：复利人生《如何客观评价市场情绪》系列文章逐篇复刻 + 我方口径自主采集。首篇=破净股占比（2026-10-14 文）。后续新维度指标以「可插拔注册」方式加入本页。</div>
+
+<div class="grid">
+  {% for c in cards %}
+  <div class="chart span4" style="padding:14px">
+    <h3 style="margin:0 0 8px">{{ c.name }} <small style="color:var(--muted);font-weight:400">{{ c.domain }} · {{ c.unit }}</small></h3>
+    {% if c.last %}
+    <div style="font-size:34px;font-weight:700;color:#4c8dff">{{ c.last.value }}<span style="font-size:14px;color:var(--muted)"> {{ c.unit }}</span></div>
+    <div style="font-size:12px;color:var(--muted);margin:4px 0 8px">
+      @{{ c.last.date }}{% if c.last.sample_count %} · 破净 {{ c.last.sample_count }} / 全A {{ c.last.denominator }}{% endif %}
+    </div>
+    <div style="font-size:13px">
+      历史分位：<b>{{ c.pctile }}%</b>{% if not c.enough %} <span style="color:#e2b341">（样本仅 {{ c.n }} 日，积累中）</span>{% endif %}
+    </div>
+    {% if c.key == 'net_break_pb' and temp is not none %}
+    <div style="margin-top:10px">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)"><span>0° 极度悲观</span><span>100° 极度乐观</span></div>
+      <div style="background:linear-gradient(90deg,#2f6bd8,#e2b341,#e5484d);border-radius:4px;height:10px;position:relative;margin-top:2px">
+        <div style="position:absolute;left:{{ temp }}%;top:-4px;width:3px;height:18px;background:#fff;border-radius:2px"></div>
+      </div>
+      <div style="text-align:center;font-size:12px;margin-top:6px">情绪温度 <b style="font-size:16px">{{ temp }}°</b>（占比越高越悲观；映射区间 0-25%）</div>
+    </div>
+    {% endif %}
+    {% else %}
+    <div style="color:var(--muted);padding:20px 0">暂无观测（{{ c.method }}）</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<div class="chart span12"><h3>破净股占比：历史顶底锚点 × 我方观测（2005-2026）</h3><div class="ec" id="cMain" style="height:380px"></div>
+  <div style="font-size:12px;color:var(--muted);padding:4px 0">灰虚线=文章锚点（作者口径，分母≈5226，引用未复算，仅作历史参照）；橙实线=我方观测（分母=全A {{ obs[-1].denominator if obs else '—' }}，含北交所，2026-10-16 起前向积累）；红色横线=10% 深度低估参考线（作者：占比≥10% 仅占历史 8.1% 交易日）。</div>
+</div>
+
+<div class="chart span12"><h3>近期观测 × 上证指数（指数线随每日复盘积累）</h3><div class="ec" id="cRecent" style="height:260px"></div></div>
+
+<div class="grid">
+  <div class="tbl span6"><h3>我方观测明细</h3>
+    <table><thead><tr><th>日期</th><th>破净家数</th><th>全A</th><th>占比%</th></tr></thead><tbody>
+    {% for r in obs %}<tr><td>{{ r.date }}</td><td>{{ r.sample_count }}</td><td>{{ r.denominator }}</td><td>{{ r.value }}</td></tr>
+    {% else %}<tr><td colspan="4" style="color:var(--muted)">（暂无）</td></tr>{% endfor %}
+    </tbody></table></div>
+  <div class="tbl span6"><h3>历史顶底锚点（文章引用）</h3>
+    <table><thead><tr><th>日期</th><th>事件</th><th>占比%</th><th>家数</th><th>复算</th></tr></thead><tbody>
+    {% for r in anchors %}<tr><td>{{ r.date }}</td><td>{{ r.label }}</td><td>{{ r.value }}</td><td>{{ r.sample_count or '—' }}</td><td style="color:var(--muted)">{{ '未复算' if not r.verified else r.verified }}</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+
+<div class="tbl span12"><h3>口径说明</h3>
+<table><thead><tr><th>指标</th><th>口径定义</th><th>来源</th></tr></thead><tbody>
+{% for c in cards %}<tr><td>{{ c.key }}</td><td>{{ c.method }}{% if c.direction == 1 %}（方向：值越高越悲观=底部信号）{% endif %}</td><td>{{ c.source }}</td></tr>{% endfor %}
+</tbody></table>
+<div style="font-size:12px;color:var(--muted);padding-top:6px">与我方口径的差异：作者分母≈5226（我方 5577 含北交所），故我方占比系统性略低于作者值（10-16 我方 8.43% vs 作者 10-13 8.17%，方向一致）。序列内部自洽，分位与趋势以我方序列为准。</div>
+</div>
+
+<script>
+const A = {{ anchors | tojson }}, O = {{ obs | tojson }}, I = {{ idx | tojson }};
+const isTop = l => l.includes('顶');
+const mk = (id, opt) => { if (document.getElementById(id) && typeof echarts !== 'undefined') echarts.init(document.getElementById(id)).setOption(opt); };
+const tip = {trigger:'item',backgroundColor:'#1b222c',borderColor:'#2a323e',textStyle:{color:'#d8dee8',fontSize:12}};
+
+// 主图：锚点连线（灰虚线）+ 锚点散点（底=金绿 顶=红）+ 我方观测（橙实线）+ 10% 参考线
+mk('cMain', {
+  backgroundColor:'transparent', tooltip:Object.assign({}, tip, {trigger:'axis'}),
+  legend:{textStyle:{color:'#8b95a5',fontSize:11},top:0,data:['文章锚点','我方观测']},
+  grid:{left:46,right:20,top:30,bottom:30},
+  xAxis:{type:'time',axisLabel:{color:'#8b95a5',fontSize:11},axisLine:{lineStyle:{color:'#2a323e'}},splitLine:{show:false}},
+  yAxis:{type:'value',max:26,axisLabel:{color:'#8b95a5',fontSize:11,formatter:'{value}%'},splitLine:{lineStyle:{color:'rgba(42,50,62,.5)'}}},
+  series:[
+    {name:'文章锚点',type:'line',data:A.map(a=>[a.date,a.value]),lineStyle:{color:'#5a6572',type:'dashed',width:1},symbol:'none',silent:true},
+    {name:'锚点散点',type:'scatter',data:A.map(a=>({value:[a.date,a.value],name:a.label+' '+a.date.slice(0,7)+' '+a.value+'%'})),
+     itemStyle:{color:p=>isTop(p.data.name)?'#e5484d':'#2fb37c'},symbolSize:9,tooltip:Object.assign({},tip,{formatter:p=>p.data.name})},
+    {name:'我方观测',type:'line',data:O.map(o=>[o.date,o.value]),lineStyle:{color:'#e2953b',width:2.5},
+     itemStyle:{color:'#e2953b'},symbolSize:6,tooltip:Object.assign({},tip,{formatter:p=>p.data[0]+' 破净占比 '+p.data[1]+'%'})},
+    {name:'10%线',type:'line',markLine:{silent:true,symbol:'none',lineStyle:{color:'#e5484d',type:'dotted'},
+     data:[{yAxis:10,label:{formatter:'10% 深度低估线',color:'#e5484d',fontSize:10}}]},data:[]}
+  ]});
+
+// 近期图：观测（左轴）+ 上证（右轴）
+if (O.length && I.length) mk('cRecent', {
+  backgroundColor:'transparent', tooltip:Object.assign({},tip,{trigger:'axis'}),
+  legend:{textStyle:{color:'#8b95a5',fontSize:11},top:0},
+  grid:{left:46,right:52,top:30,bottom:26},
+  xAxis:{type:'category',data:I.map(r=>r.date.slice(5)),axisLabel:{color:'#8b95a5',fontSize:11},axisLine:{lineStyle:{color:'#2a323e'}}},
+  yAxis:[{type:'value',axisLabel:{color:'#8b95a5',fontSize:11,formatter:'{value}%'},splitLine:{lineStyle:{color:'rgba(42,50,62,.5)'}}},
+         {type:'value',axisLabel:{color:'#8b95a5',fontSize:11},splitLine:{show:false}}],
+  series:[
+    {name:'破净占比%',type:'line',yAxisIndex:0,data:I.map(r=>{const m=O.find(o=>o.date===r.date);return m?m.value:null;}),
+     connectNulls:true,lineStyle:{color:'#e2953b',width:2},itemStyle:{color:'#e2953b'}},
+    {name:'上证指数',type:'line',yAxisIndex:1,data:I.map(r=>r.close),lineStyle:{color:'#4c8dff',width:1.5},itemStyle:{color:'#4c8dff'}}]});
+</script>
+{% endblock %}
