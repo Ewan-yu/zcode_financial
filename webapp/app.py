@@ -493,5 +493,118 @@ def stock(code):
                            pools_in=[p["pool"] for p in pools_in])
 
 
+# ---------------- 页面：市场广度信号看板（docs/breadth-backtest-design.md v1.2） ----------------
+
+@app.route("/breadth")
+def breadth():
+    """复刻复利人生《市场广度》看板：头部状态 + 8口径切换主图 + 信号标注 + 胜率摘要。
+    事件口径=滞回（tools/breadth.py）；广度值滞后 15 交易日（乐咕），问财尾部待补。"""
+    import bisect
+    import breadth as bt
+
+    code_sel = request.args.get("code", "cyb")
+    if code_sel not in bt.CODE_NAME:
+        code_sel = "cyb"
+    conn = sqlite3.connect(str(DB))
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = {}
+        latest = {}
+        for c in bt.CODE_NAME:
+            s = bt.series(conn, c)
+            rows[c] = s
+            last20 = next((r for r in reversed(s) if r["b20"] is not None), None)
+            last60 = next((r for r in reversed(s) if r["b60"] is not None), None)
+            latest[c] = {"date": (last20 or last60 or {}).get("date"),
+                         "b20": (last20 or {}).get("b20"),
+                         "b60": (last60 or {}).get("b60")}
+
+        # 市场状态[发明]：全A b20 在自身历史分布的分位（<P20 偏弱 / P20-P80 中性 / >P80 偏强）
+        all_hist = [r["b20"] for r in rows["all"] if r["b20"] is not None]
+        a_now = latest["all"]["b20"]
+        pct = None
+        if a_now is not None and all_hist:
+            pct = round(bisect.bisect_right(sorted(all_hist), a_now) / len(all_hist) * 100, 1)
+            status = "偏弱" if pct < 20 else ("偏强" if pct > 80 else "中性")
+        else:
+            status = "—"
+
+        # 各口径当前状态与命中信号（状态口径=最新广度日）
+        table = []
+        oversold, resonant = [], []
+        for c, nm in bt.CODE_NAME.items():
+            L = latest[c]
+            if L["b20"] is None:
+                table.append({"code": c, "name": nm, **L, "state": "无数据", "sigs": []})
+                continue
+            sigs = []
+            if L["b20"] < 10: sigs.append("S1")
+            if L["b20"] < 20: sigs.append("S2")
+            if L["b20"] > 80: sigs.append("S7")
+            if L["b60"] is not None:
+                if L["b60"] < 20: sigs.append("S13")
+                if L["b60"] > 80: sigs.append("S14")
+            deep = (L["b20"] < 10) or (L["b60"] is not None and L["b60"] < 10)
+            state = ("深度超卖" if deep else "超卖" if "S2" in sigs or "S13" in sigs
+                     else "超买" if "S7" in sigs or "S14" in sigs else "—")
+            if state in ("超卖", "深度超卖"):
+                oversold.append(nm)
+            if L["b20"] < 20 and (L["b60"] or 0) < 20:
+                resonant.append(nm)
+            table.append({"code": c, "name": nm, **L, "state": state, "sigs": sigs})
+
+        # 选中口径：主图数据 + 事件标注 + 胜率摘要
+        s = rows[code_sel]
+        dates = [r["date"] for r in s]
+        b20 = [r["b20"] for r in s]
+        b60 = [r["b60"] for r in s]
+        close = [r["close"] for r in s]
+        idx = {d: i for i, d in enumerate(dates)}
+        ev = {
+            "S1": bt.edge_events(dates, b20, True, 10), "S2": bt.edge_events(dates, b20, True, 20),
+            "S7": bt.edge_events(dates, b20, False, 80), "S13": bt.edge_events(dates, b60, True, 20),
+            "S14": bt.edge_events(dates, b60, False, 80), "RES": bt.resonance_events(dates, b20, b60),
+            "THR": bt.thrust_events(dates, b20),
+        }
+        buy_marks, warn_marks = [], []
+        for sid in ("S1", "S2", "S13", "RES"):
+            buy_marks += [{"date": d, "sid": sid, "close": close[idx[d]]} for d in ev[sid] if close[idx[d]]]
+        for sid in ("S7", "S14"):
+            warn_marks += [{"date": d, "sid": sid, "close": close[idx[d]]} for d in ev[sid] if close[idx[d]]]
+        # 胜率摘要（选中口径，S2/S13/RES × 20/60 交易日）
+        summary = {}
+        for sid in ("S2", "S13", "RES"):
+            st = bt.fwd_stats(dates, close, ev[sid], [20, 60])
+            summary[sid] = {"n": st["n_events"], "h20": st["holds"][20], "h60": st["holds"][60],
+                            "base20": st["baseline"][20]}
+        # 近期事件表（全口径混合，近 40 条）
+        recent = []
+        for c, nm in bt.CODE_NAME.items():
+            rc = rows[c]
+            dd = [r["date"] for r in rc]
+            c20 = [r["b20"] for r in rc]
+            c60 = [r["b60"] for r in rc]
+            for sid, ds in (("S1", bt.edge_events(dd, c20, True, 10)),
+                            ("S2", bt.edge_events(dd, c20, True, 20)),
+                            ("S7", bt.edge_events(dd, c20, False, 80)),
+                            ("S13", bt.edge_events(dd, c60, True, 20)),
+                            ("S14", bt.edge_events(dd, c60, False, 80)),
+                            ("RES", bt.resonance_events(dd, c20, c60))):
+                recent += [{"date": d, "code": nm, "sid": sid} for d in ds]
+        recent.sort(key=lambda x: x["date"], reverse=True)
+        recent = recent[:40]
+    finally:
+        conn.close()
+
+    return render_template("breadth.html", code=code_sel, code_name=bt.CODE_NAME[code_sel],
+                           latest=latest, table=table, status=status, pct=pct,
+                           oversold=oversold, resonant=resonant, all_b20=a_now,
+                           all_date=latest["all"]["date"],
+                           dates=dates, b20=b20, b60=b60, close=close,
+                           buy_marks=buy_marks, warn_marks=warn_marks,
+                           summary=summary, recent=recent,
+                           sig_desc=bt.SIG_DESC)
+
+
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=8787, debug=False, threaded=True)
