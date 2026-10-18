@@ -271,6 +271,31 @@ def cmd_series(a):
     return 0
 
 
+# ---------------- gaps（断档检测） ----------------
+
+def cmd_gaps(a):
+    """对比交易日列表与已有观测，输出缺失日期（供断档回补）。
+
+    交易日列表文件：AI 由 wind-index kline 生成，JSON 数组 ["YYYY-MM-DD",...]。
+    """
+    days = json.loads(Path(a.days_file).read_text(encoding="utf-8"))
+    conn = connect()
+    have = {r["date"] for r in conn.execute(
+        "SELECT date FROM mood_obs WHERE key=?", (a.key,))}
+    first = min(have) if have else None
+    # 只检查首个观测日之后的缺口（起点之前属未采集历史，不算断档）
+    missing = [d for d in days if (not first or d > first) and d not in have]
+    last = max(have) if have else None
+    if not missing:
+        _out("gaps %s：无缺失（最后观测 %s，交易日历 %d 天）" % (a.key, last, len(days)))
+        return 0
+    _out("gaps %s：最后观测 %s，缺失 %d 个交易日（回补成本≈%d 次问财调用）"
+         % (a.key, last, len(missing), len(missing) * 3))
+    for d in missing:
+        _out("  缺 " + d)
+    return 0
+
+
 # ---------------- selftest ----------------
 
 def cmd_selftest(a):
@@ -375,6 +400,11 @@ def main(argv=None):
     p.add_argument("--days", type=int)
     p.add_argument("--tail", type=int, default=20)
     p.set_defaults(fn=cmd_series)
+
+    p = sub.add_parser("gaps")
+    p.add_argument("--key", required=True)
+    p.add_argument("--days-file", required=True, help="交易日列表 JSON（wind-index kline 生成）")
+    p.set_defaults(fn=cmd_gaps)
 
     sub.add_parser("selftest").set_defaults(fn=cmd_selftest)
 
