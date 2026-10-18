@@ -495,17 +495,77 @@ def stock(code):
 
 # ---------------- 页面：市场广度信号看板（docs/breadth-backtest-design.md v1.2） ----------------
 
+def _bd_chart_payload(conn, code, rng):
+    """选中口径的图表+摘要载荷（页面初始渲染与 /api/breadth/data 共用）。"""
+    import breadth as bt
+    s = bt.series(conn, code)
+    dates_all = [r["date"] for r in s]
+    b5_all = [r["b5"] for r in s]
+    b20_all = [r["b20"] for r in s]
+    b60_all = [r["b60"] for r in s]
+    close_all = [r["close"] for r in s]
+    ev_all = {
+        "S1": bt.edge_events(dates_all, b20_all, True, 10),
+        "S2": bt.edge_events(dates_all, b20_all, True, 20),
+        "S7": bt.edge_events(dates_all, b20_all, False, 80),
+        "S13": bt.edge_events(dates_all, b60_all, True, 20),
+        "S14": bt.edge_events(dates_all, b60_all, False, 80),
+        "RES": bt.resonance_events(dates_all, b20_all, b60_all),
+    }
+    if rng == "1y" and len(dates_all) > 245:
+        cut = len(dates_all) - 245
+    else:
+        cut = 0
+    idx = {d: i for i, d in enumerate(dates_all)}
+    buy_marks, warn_marks = [], []
+    for sid in ("S1", "S2", "S13", "RES"):
+        buy_marks += [{"date": d, "sid": sid, "close": close_all[idx[d]]}
+                      for d in ev_all[sid] if idx[d] >= cut and close_all[idx[d]]]
+    for sid in ("S7", "S14"):
+        warn_marks += [{"date": d, "sid": sid, "close": close_all[idx[d]]}
+                       for d in ev_all[sid] if idx[d] >= cut and close_all[idx[d]]]
+    summary = {}
+    for sid in ("S2", "S13", "RES"):
+        st = bt.fwd_stats(dates_all, close_all, ev_all[sid], [20, 60])
+        summary[sid] = {"n": st["n_events"], "h20": st["holds"][20], "h60": st["holds"][60],
+                        "base20": st["baseline"][20]}
+    return {
+        "code": code, "name": bt.CODE_NAME[code], "rng": rng,
+        "dates": dates_all[cut:], "b5": b5_all[cut:], "b20": b20_all[cut:],
+        "b60": b60_all[cut:], "close": close_all[cut:],
+        "last_date": dates_all[-1] if dates_all else None,
+        "buy_marks": buy_marks, "warn_marks": warn_marks, "summary": summary,
+    }
+
+
+@app.route("/api/breadth/data")
+def api_breadth_data():
+    code = request.args.get("code", "cyb")
+    rng = request.args.get("rng", "1y")
+    import breadth as bt
+    if code not in bt.CODE_NAME:
+        code = "cyb"
+    if rng not in ("1y", "all"):
+        rng = "1y"
+    conn = sqlite3.connect(str(DB))
+    conn.row_factory = sqlite3.Row
+    try:
+        return json.dumps(_bd_chart_payload(conn, code, rng), ensure_ascii=False)
+    finally:
+        conn.close()
+
+
 @app.route("/breadth")
 def breadth():
     """复刻复利人生《市场广度》看板：头部共振行+信号图例 + 八口径卡片 + 三段堆叠子图
-    （MA20/MA5/MA60）+ 胜率摘要。事件口径=滞回（tools/breadth.py）；
-    广度值滞后 15 交易日（乐咕），问财尾部待补。"""
+    （MA20/MA5/MA60）+ 胜率摘要。口径/区间切换走 /api/breadth/data 前端无刷新重绘。
+    事件口径=滞回（tools/breadth.py）；广度值滞后 15 交易日（乐咕），问财尾部待补。"""
     import breadth as bt
 
     code_sel = request.args.get("code", "cyb")
     if code_sel not in bt.CODE_NAME:
         code_sel = "cyb"
-    rng = request.args.get("range", "1y")
+    rng = request.args.get("rng", "1y")
     if rng not in ("1y", "all"):
         rng = "1y"
     conn = sqlite3.connect(str(DB))
@@ -558,41 +618,7 @@ def breadth():
             cards.append({"code": c, "name": nm, **L, "badge": badge, "bclass": bclass,
                           "sigs": sigs, "pos": pos})
 
-        # 选中口径：区间切片 + 事件标注 + 胜率摘要
-        s = series_map[code_sel]
-        dates_all = [r["date"] for r in s]
-        b5_all = [r["b5"] for r in s]
-        b20_all = [r["b20"] for r in s]
-        b60_all = [r["b60"] for r in s]
-        close_all = [r["close"] for r in s]
-        ev_all = {
-            "S1": bt.edge_events(dates_all, b20_all, True, 10),
-            "S2": bt.edge_events(dates_all, b20_all, True, 20),
-            "S7": bt.edge_events(dates_all, b20_all, False, 80),
-            "S13": bt.edge_events(dates_all, b60_all, True, 20),
-            "S14": bt.edge_events(dates_all, b60_all, False, 80),
-            "RES": bt.resonance_events(dates_all, b20_all, b60_all),
-        }
-        if rng == "1y" and len(dates_all) > 245:
-            lo = 1 if dates_all[-245] <= latest[code_sel]["date"] else 0
-            cut = len(dates_all) - 245
-        else:
-            cut = 0
-        dates = dates_all[cut:]
-        b5, b20, b60, close = b5_all[cut:], b20_all[cut:], b60_all[cut:], close_all[cut:]
-        idx = {d: i for i, d in enumerate(dates_all)}
-        buy_marks, warn_marks = [], []
-        for sid in ("S1", "S2", "S13", "RES"):
-            buy_marks += [{"date": d, "sid": sid, "close": close_all[idx[d]]}
-                          for d in ev_all[sid] if idx[d] >= cut and close_all[idx[d]]]
-        for sid in ("S7", "S14"):
-            warn_marks += [{"date": d, "sid": sid, "close": close_all[idx[d]]}
-                           for d in ev_all[sid] if idx[d] >= cut and close_all[idx[d]]]
-        summary = {}
-        for sid in ("S2", "S13", "RES"):
-            st = bt.fwd_stats(dates_all, close_all, ev_all[sid], [20, 60])
-            summary[sid] = {"n": st["n_events"], "h20": st["holds"][20], "h60": st["holds"][60],
-                            "base20": st["baseline"][20]}
+        payload = _bd_chart_payload(conn, code_sel, rng)
         # 近期事件表（全口径混合，近 40 条）
         recent = []
         for c, nm in bt.CODE_NAME.items():
@@ -610,10 +636,11 @@ def breadth():
                            rng=rng, cards=cards, status=status,
                            oversold=oversold, resonant=resonant,
                            all_b20=a_now, all_date=latest["all"]["date"],
-                           dates=dates, b5=b5, b20=b20, b60=b60, close=close,
-                           last_date=dates[-1] if dates else None,
-                           buy_marks=buy_marks, warn_marks=warn_marks,
-                           summary=summary, recent=recent, sig_desc=bt.SIG_DESC)
+                           dates=payload["dates"], b5=payload["b5"], b20=payload["b20"],
+                           b60=payload["b60"], close=payload["close"],
+                           last_date=payload["last_date"],
+                           buy_marks=payload["buy_marks"], warn_marks=payload["warn_marks"],
+                           summary=payload["summary"], recent=recent, sig_desc=bt.SIG_DESC)
 
 
 if __name__ == "__main__":

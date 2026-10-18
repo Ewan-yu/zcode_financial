@@ -62,37 +62,38 @@
   {% endfor %}
 </div>
 
-<!-- 口径/区间切换 + 三段堆叠子图（作者版式） -->
+<!-- 口径/区间切换 + 三段堆叠子图（作者版式；切换=前端无刷新） -->
 <div class="chart span12">
   <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 4px 8px;flex-wrap:wrap;gap:8px">
-    <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <div style="display:flex;gap:6px;flex-wrap:wrap" id="codePills">
       {% for c, nm in [('all','全A'),('sz50','上证50'),('hs300','沪深300'),('zz500','中证500'),('csi1000','中证1000'),('gz2000','中证2000*'),('cyb','创业板指'),('kc50','科创50')] %}
-      <a href="{{ url_for('breadth', code=c, rng=rng) }}" class="pill{{ ' active' if c==code }}" style="text-decoration:none">{{ nm }}</a>
+      <a href="{{ url_for('breadth', code=c, rng=rng) }}" data-code="{{ c }}" class="pill js-switch{{ ' active' if c==code }}">{{ nm }}</a>
       {% endfor %}
     </div>
     <div style="display:flex;gap:6px;align-items:center">
-      <a href="{{ url_for('breadth', code=code, rng='1y') }}" class="pill{{ ' active' if rng=='1y' }}" style="text-decoration:none">近一年</a>
-      <a href="{{ url_for('breadth', code=code, rng='all') }}" class="pill{{ ' active' if rng=='all' }}" style="text-decoration:none">全部</a>
+      <span style="font-size:12px;color:var(--muted);margin-right:2px">区间</span>
+      <a href="{{ url_for('breadth', code=code, rng='1y') }}" data-rng="1y" class="pill js-switch{{ ' active' if rng=='1y' }}">近一年</a>
+      <a href="{{ url_for('breadth', code=code, rng='all') }}" data-rng="all" class="pill js-switch{{ ' active' if rng=='all' }}">全部</a>
       <span style="font-size:12px;color:var(--muted);margin-left:6px">灰线=收盘点位（右轴）</span>
     </div>
   </div>
   <div class="ec" id="cMain" style="height:760px"></div>
   <div style="font-size:12px;color:var(--muted);padding:2px 4px">
-    「{{ code_name }}」收盘点位 × 广度：蓝线=广度（左轴 0-100），灰线=收盘（右轴）；红带&gt;80 超买区 / 绿带&lt;20 超卖区；
+    「<span id="bdChartName">{{ code_name }}</span>」收盘点位 × 广度：蓝线=广度（左轴 0-100），灰线=收盘（右轴）；红带&gt;80 超买区 / 绿带&lt;20 超卖区；
     ▲买类事件 ▼警戒事件（滞回口径，MA20 面板）。*中证2000 以国证2000 近似（乐咕口径）。
   </div>
   <div style="font-size:12px;color:#9ca3af;padding:0 4px">
-    数据截至 <b>{{ last_date or '—' }}</b>（各口径广度日不一，卡片以其最新广度日为准） · 数据源：乐咕乐股（滞后 15 交易日）+ workbench.db · 问财新鲜尾部待补
+    数据截至 <b id="bdLastDate">{{ last_date or '—' }}</b>（各口径广度日不一，卡片以其最新广度日为准） · 数据源：乐咕乐股（滞后 15 交易日）+ workbench.db · 问财新鲜尾部待补
   </div>
 </div>
 
 <!-- 胜率摘要 + 近期事件 -->
 <div class="grid">
-  <div class="chart span5">
-    <h3>{{ code_name }} 关键信号前瞻收益（触发日收盘入场，2022-08 起全窗口）</h3>
+  <div class="chart span5" id="bdSummary">
+    <h3><span id="bdSumName">{{ code_name }}</span> 关键信号前瞻收益（触发日收盘入场，2022-08 起全窗口）</h3>
     <table style="width:100%;font-size:12.5px">
       <thead><tr><th>信号</th><th>n</th><th>20日 胜率/均值</th><th>60日 胜率/均值</th></tr></thead>
-      <tbody>
+      <tbody id="bdSumBody">
       {% for sid, s in summary.items() %}
         <tr><td><b>{{ sid }}</b> {{ '超卖' if sid=='S2' else ('中期超卖' if sid=='S13' else '共振') }}</td>
           <td>{{ s.n }}</td>
@@ -134,72 +135,104 @@
 <script>
 /* 命名空间 BD：避免与 board.js 全局常量（WARN/TEXT/LINE 等）冲突 */
 const BD = {
+  code: "{{ code }}", rng: "{{ rng }}", name: "{{ code_name }}",
   dates: {{ dates | tojson }}, b5: {{ b5 | tojson }}, b20: {{ b20 | tojson }},
   b60: {{ b60 | tojson }}, close: {{ close | tojson }},
-  buy: {{ buy_marks | tojson }}, warn: {{ warn_marks | tojson }}
+  buy_marks: {{ buy_marks | tojson }}, warn_marks: {{ warn_marks | tojson }}
 };
 (function () {
   if (typeof echarts === "undefined" || !BD.dates.length) return;
   const ch = echarts.init(document.getElementById("cMain"));
   const axisTxt = { color: "#6b7280", fontSize: 10.5 };
   const axisLine = { lineStyle: { color: "#e5e7eb" } };
-  const mkBands = [{ yAxis: 80, itemStyle: { color: "rgba(220,38,38,.05)" } },
-                   { yAxis: [0, 20], itemStyle: { color: "rgba(14,159,110,.06)" } }];
-  function breadthSeries(name, data, gi, showMarks) {
-    return { name: name, type: "line", data: data, xAxisIndex: gi, yAxisIndex: gi * 2,
-      symbol: "none", connectNulls: true, sampling: "lttb",
-      lineStyle: { color: "#2563eb", width: 1.7 },
-      endLabel: { show: true, formatter: p => (p.value == null ? "" : p.value.toFixed ? p.value.toFixed(1) : p.value) + "%",
-                  color: "#2563eb", fontSize: 11 },
-      markArea: { silent: true, data: [[{ yAxis: 80, itemStyle: { color: "rgba(220,38,38,.05)" } }, { yAxis: 100 }],
-                                       [{ yAxis: 0, itemStyle: { color: "rgba(14,159,110,.06)" } }, { yAxis: 20 }]] },
-      markLine: { silent: true, symbol: "none", lineStyle: { color: "#d1d5db", type: "dashed" },
-        label: { show: gi === 0, fontSize: 10, color: "#9ca3af" },
-        data: [{ yAxis: 80, label: { formatter: "80" } }, { yAxis: 50, label: { formatter: "50" } },
-               { yAxis: 20, label: { formatter: "20" } }] } };
+
+  function buildOption(P) {
+    const grids = [], xAxes = [], yAxes = [], series = [];
+    const names = [["收盘点位 × MA20 广度", P.b20], ["收盘点位 × MA5 广度", P.b5], ["收盘点位 × MA60 广度", P.b60]];
+    names.forEach((n, gi) => {
+      const top = 26 + gi * 240;
+      grids.push({ left: 52, right: 62, top: top, height: 196 });
+      xAxes.push({ type: "category", gridIndex: gi, data: P.dates,
+        axisLabel: { ...axisTxt, show: gi === 2, hideOverlap: true, formatter: v => v.slice(2) },
+        axisLine: axisLine, splitLine: { show: false } });
+      yAxes.push({ type: "value", gridIndex: gi, min: 0, max: 100, interval: 30,
+        axisLabel: axisTxt, splitLine: { show: false }, axisLine: { show: false } });
+      yAxes.push({ type: "value", gridIndex: gi, scale: true, splitLine: { show: false },
+        axisLabel: { ...axisTxt, formatter: v => Math.round(v).toLocaleString() }, axisLine: { show: false } });
+      series.push({ name: "收盘", type: "line", data: P.close, xAxisIndex: gi, yAxisIndex: gi * 2 + 1,
+        symbol: "none", sampling: "lttb", lineStyle: { color: "#9ca3af", width: 1.1 },
+        endLabel: { show: true, formatter: p => (p.value == null ? "" : Math.round(p.value).toLocaleString()),
+                    color: "#9ca3af", fontSize: 10.5 } });
+      series.push({ name: n[0], type: "line", data: n[1], xAxisIndex: gi, yAxisIndex: gi * 2,
+        symbol: "none", connectNulls: true, sampling: "lttb",
+        lineStyle: { color: "#2563eb", width: 1.7 },
+        endLabel: { show: true, formatter: p => (p.value == null ? "" : (+p.value).toFixed(1)) + "%",
+                    color: "#2563eb", fontSize: 11 },
+        markLine: { silent: true, symbol: "none", lineStyle: { color: "#d1d5db", type: "dashed" },
+          label: { show: gi === 0, fontSize: 10, color: "#9ca3af" },
+          data: [{ yAxis: 80, label: { formatter: "80" } }, { yAxis: 50, label: { formatter: "50" } },
+                 { yAxis: 20, label: { formatter: "20" } }] } });
+    });
+    series.push({ name: "买类事件", type: "scatter", xAxisIndex: 0, yAxisIndex: 1, symbol: "triangle",
+      symbolSize: 9, itemStyle: { color: "#dc2626" },
+      data: P.buy_marks.map(m => ({ value: [m.date, m.close], sid: m.sid })),
+      tooltip: { formatter: p => p.data.sid + " 买类事件<br>" + p.value[0] + " @" + p.value[1] } });
+    series.push({ name: "警戒事件", type: "scatter", xAxisIndex: 0, yAxisIndex: 1,
+      symbol: "path://M0,0L8,0L4,7Z", symbolSize: 9, itemStyle: { color: "#d97706" },
+      data: P.warn_marks.map(m => ({ value: [m.date, m.close], sid: m.sid })),
+      tooltip: { formatter: p => p.data.sid + " 警戒事件<br>" + p.value[0] + " @" + p.value[1] } });
+    const titles = names.map((n, gi) => ({
+      text: n[0], left: 56, top: 4 + gi * 240,
+      textStyle: { color: "#374151", fontSize: 12.5, fontWeight: 600 } }));
+    return {
+      backgroundColor: "transparent",
+      tooltip: { trigger: "axis", backgroundColor: "#fff", borderColor: "#e5e7eb",
+        textStyle: { color: "#374151", fontSize: 12 }, axisPointer: { type: "cross", crossStyle: { color: "#999" } } },
+      axisPointer: { link: [{ xAxisIndex: "all" }] },
+      title: titles, legend: { show: false }, grid: grids, xAxis: xAxes, yAxis: yAxes, series: series
+    };
   }
-  function closeSeries(gi, showAxis) {
-    return { name: "收盘", type: "line", data: BD.close, xAxisIndex: gi, yAxisIndex: gi * 2 + 1,
-      symbol: "none", sampling: "lttb", lineStyle: { color: "#9ca3af", width: 1.1 },
-      endLabel: { show: true, formatter: p => (p.value == null ? "" : Math.round(p.value).toLocaleString()),
-                  color: "#9ca3af", fontSize: 10.5 } };
-  }
-  const grids = [], xAxes = [], yAxes = [], series = [];
-  const names = [["收盘点位 × MA20 广度", BD.b20], ["收盘点位 × MA5 广度", BD.b5], ["收盘点位 × MA60 广度", BD.b60]];
-  names.forEach((n, gi) => {
-    const top = 26 + gi * 240;
-    grids.push({ left: 52, right: 62, top: top, height: 196 });
-    xAxes.push({ type: "category", gridIndex: gi, data: BD.dates,
-      axisLabel: { ...axisTxt, show: gi === 2, hideOverlap: true, formatter: v => v.slice(2) },
-      axisLine: axisLine, splitLine: { show: false } });
-    yAxes.push({ type: "value", gridIndex: gi, min: 0, max: 100, interval: 30,
-      axisLabel: { ...axisTxt, formatter: v => v }, splitLine: { show: false }, axisLine: { show: false } });
-    yAxes.push({ type: "value", gridIndex: gi, scale: true, splitLine: { show: false },
-      axisLabel: { ...axisTxt, formatter: v => Math.round(v).toLocaleString(), show: true }, axisLine: { show: false } });
-    series.push(closeSeries(gi));
-    series.push(breadthSeries(n[0], n[1], gi));
-  });
-  // 事件标注（MA20 面板，落在收盘右轴上）
-  series.push({ name: "买类事件", type: "scatter", xAxisIndex: 0, yAxisIndex: 1, symbol: "triangle",
-    symbolSize: 9, itemStyle: { color: "#dc2626" },
-    data: BD.buy.map(m => ({ value: [m.date, m.close], sid: m.sid })),
-    tooltip: { formatter: p => p.data.sid + " 买类事件<br>" + p.value[0] + " @" + p.value[1] } });
-  series.push({ name: "警戒事件", type: "scatter", xAxisIndex: 0, yAxisIndex: 1,
-    symbol: "path://M0,0L8,0L4,7Z", symbolSize: 9, itemStyle: { color: "#d97706" },
-    data: BD.warn.map(m => ({ value: [m.date, m.close], sid: m.sid })),
-    tooltip: { formatter: p => p.data.sid + " 警戒事件<br>" + p.value[0] + " @" + p.value[1] } });
-  // 面板标题
-  const titles = names.map((n, gi) => ({
-    text: n[0], left: 56, top: top_(gi), textStyle: { color: "#374151", fontSize: 12.5, fontWeight: 600 } }));
-  function top_(gi) { return 4 + gi * 240; }
-  ch.setOption({
-    backgroundColor: "transparent",
-    tooltip: { trigger: "axis", backgroundColor: "#fff", borderColor: "#e5e7eb",
-      textStyle: { color: "#374151", fontSize: 12 }, axisPointer: { type: "cross", crossStyle: { color: "#999" } } },
-    axisPointer: { link: [{ xAxisIndex: "all" }] },
-    title: titles, legend: { show: false }, grid: grids, xAxis: xAxes, yAxis: yAxes, series: series
-  });
+  ch.setOption(buildOption(BD));
   window.addEventListener("resize", () => ch.resize());
+
+  function renderSummary(P) {
+    document.getElementById("bdSumName").textContent = P.name;
+    const SIG_CN = { S2: "超卖", S13: "中期超卖", RES: "共振" };
+    const fmt = v => (v == null ? "—" : v);
+    const cell = h => {
+      const cls = (h.win != null && h.win > 55) ? ' class="up"' : "";
+      return `<td${cls}>${fmt(h.win)}${h.win != null ? "%" : ""} / ${fmt(h.mean)}${h.mean != null ? "%" : ""}</td>`;
+    };
+    document.getElementById("bdSumBody").innerHTML = Object.entries(P.summary).map(([sid, s]) =>
+      `<tr><td><b>${sid}</b> ${SIG_CN[sid] || ""}</td><td>${s.n}</td>${cell(s.h20)}${cell(s.h60)}</tr>`
+    ).join("");
+  }
+  /* 前端无刷新切换：fetch JSON → 重绘图表+摘要，replaceState 记录状态。
+     绑定用文档级委托（capture）：元素级绑定若在图表初始化抛错后不会执行，
+     且委托对 preventDefault 的生效性已实测（2026-10-18）。 */
+  let cur = { code: BD.code, rng: BD.rng };
+  async function switchTo(code, rng) {
+    document.querySelectorAll("#codePills .pill").forEach(x => x.classList.toggle("active", x.dataset.code === code));
+    document.querySelectorAll("[data-rng]").forEach(x => x.classList.toggle("active", x.dataset.rng === rng));
+    try {
+      const r = await fetch(`/api/breadth/data?code=${code}&rng=${rng}`);
+      const P = await r.json();
+      Object.assign(BD, P);
+      if (typeof ch !== "undefined" && ch) ch.setOption(buildOption(P), { notMerge: true });
+      document.getElementById("bdChartName").textContent = P.name;
+      document.getElementById("bdLastDate").textContent = P.last_date || "—";
+      renderSummary(P);
+      cur = { code, rng };
+      /* 注意：不要用 history.replaceState 同步 URL——内嵌浏览器实测会触发整页重载
+         （2026-10-18），滚动位置丢失。本地工具可接受 URL 不随切换变化。 */
+    } catch (e) { /* 接口失败保留现图 */ }
+  }
+  document.addEventListener("click", e => {
+    const el = e.target.closest("[data-code],[data-rng]");
+    if (!el) return;
+    e.preventDefault();
+    switchTo(el.dataset.code || cur.code, el.dataset.rng || cur.rng);
+  }, true);
 })();
 </script>
 {% endblock %}
