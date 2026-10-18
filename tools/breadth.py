@@ -27,12 +27,13 @@ CODE_MAP = {"all": "all", "sz50": "sz50", "hs300": "hs300", "zz500": "zz500",
 CODE_NAME = {"all": "全A", "sz50": "上证50", "hs300": "沪深300", "zz500": "中证500",
              "kc50": "科创50", "cyb": "创业板指", "csi1000": "中证1000", "gz2000": "国证2000"}
 
-# ---- 信号阈值（作者 2026-10-14 版；改这里=改一处，先改 docs 再改代码） ----
-TH = {"S1": 10, "S2": 20, "S7": 80, "S13": 20, "S14": 80}
+# ---- 信号阈值（作者 2026-10-14 版看板图例；改这里=改一处，先改 docs 再改代码） ----
+TH = {"S1": 10, "S2": 20, "S7": 80, "S12": 10, "S13": 20, "S14": 80}
 SIG_DESC = {
-    "S1": "深度超卖 MA20<10 → 买入", "S2": "超卖 MA20<20 → 建仓",
-    "S7": "超买 MA20>80 → 强势确认", "S13": "中期超卖 MA60<20 → 中期买入区",
-    "S14": "中期超买 MA60>80 → 停加仓",
+    "S1": "深度超卖 MA20<10% → 买入", "S2": "超卖 MA20<20% → 建仓",
+    "S7": "超买 MA20>80% → 停加仓", "S12": "中期深度超卖 MA60<10% → 买入",
+    "S13": "中期超卖 MA60<20% → 建仓",
+    "S14": "中期超买 MA60>80% → 停加仓",
     "S10": "顶背离(实验) 指数新高广度低5pp → 减仓预警",
     "S11": "底背离(实验) 指数新低广度高5pp → 准备买入",
     "RES": "买入共振 MA20&MA60 同日双<20（首次触发）",
@@ -297,6 +298,7 @@ def all_signals(conn, code):
         "S1": [{"date": d} for d in edge_events(dates, b20, True, TH["S1"])],
         "S2": [{"date": d} for d in edge_events(dates, b20, True, TH["S2"])],
         "S7": [{"date": d} for d in edge_events(dates, b20, False, TH["S7"])],
+        "S12": [{"date": d} for d in edge_events(dates, b60, True, TH["S12"])],
         "S13": [{"date": d} for d in edge_events(dates, b60, True, TH["S13"])],
         "S14": [{"date": d} for d in edge_events(dates, b60, False, TH["S14"])],
         "RES": [{"date": d} for d in resonance_events(dates, b20, b60)],

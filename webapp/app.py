@@ -497,113 +497,123 @@ def stock(code):
 
 @app.route("/breadth")
 def breadth():
-    """复刻复利人生《市场广度》看板：头部状态 + 8口径切换主图 + 信号标注 + 胜率摘要。
-    事件口径=滞回（tools/breadth.py）；广度值滞后 15 交易日（乐咕），问财尾部待补。"""
-    import bisect
+    """复刻复利人生《市场广度》看板：头部共振行+信号图例 + 八口径卡片 + 三段堆叠子图
+    （MA20/MA5/MA60）+ 胜率摘要。事件口径=滞回（tools/breadth.py）；
+    广度值滞后 15 交易日（乐咕），问财尾部待补。"""
     import breadth as bt
 
     code_sel = request.args.get("code", "cyb")
     if code_sel not in bt.CODE_NAME:
         code_sel = "cyb"
+    rng = request.args.get("range", "1y")
+    if rng not in ("1y", "all"):
+        rng = "1y"
     conn = sqlite3.connect(str(DB))
     conn.row_factory = sqlite3.Row
     try:
-        rows = {}
-        latest = {}
+        series_map, latest = {}, {}
         for c in bt.CODE_NAME:
             s = bt.series(conn, c)
-            rows[c] = s
+            series_map[c] = s
             last20 = next((r for r in reversed(s) if r["b20"] is not None), None)
             last60 = next((r for r in reversed(s) if r["b60"] is not None), None)
             latest[c] = {"date": (last20 or last60 or {}).get("date"),
+                         "b5": (last20 or {}).get("b5"),
                          "b20": (last20 or {}).get("b20"),
-                         "b60": (last60 or {}).get("b60")}
+                         "b60": (last60 or {}).get("b60"),
+                         "close": (last20 or last60 or {}).get("close")}
 
-        # 市场状态[发明]：全A b20 在自身历史分布的分位（<P20 偏弱 / P20-P80 中性 / >P80 偏强）
-        all_hist = [r["b20"] for r in rows["all"] if r["b20"] is not None]
+        # 市场状态[发明，以作者 2026-10-14 全A 24.1%→偏弱 校准]：<30 偏弱 / >70 偏强
         a_now = latest["all"]["b20"]
-        pct = None
-        if a_now is not None and all_hist:
-            pct = round(bisect.bisect_right(sorted(all_hist), a_now) / len(all_hist) * 100, 1)
-            status = "偏弱" if pct < 20 else ("偏强" if pct > 80 else "中性")
-        else:
-            status = "—"
+        status = ("—" if a_now is None else
+                  ("偏弱" if a_now < 30 else ("偏强" if a_now > 70 else "中性")))
 
-        # 各口径当前状态与命中信号（状态口径=最新广度日）
-        table = []
-        oversold, resonant = [], []
+        # 八口径卡片：状态徽章 / 触发信号 / 仓位建议[作者规则]
+        cards, oversold, resonant = [], [], []
         for c, nm in bt.CODE_NAME.items():
-            L = latest[c]
+            L = dict(latest[c])
             if L["b20"] is None:
-                table.append({"code": c, "name": nm, **L, "state": "无数据", "sigs": []})
+                cards.append({"code": c, "name": nm, **L, "badge": "无数据", "bclass": "gray",
+                              "sigs": [], "pos": "数据滞后中（乐咕 T-15）"})
                 continue
             sigs = []
             if L["b20"] < 10: sigs.append("S1")
             if L["b20"] < 20: sigs.append("S2")
             if L["b20"] > 80: sigs.append("S7")
             if L["b60"] is not None:
+                if L["b60"] < 10: sigs.append("S12")
                 if L["b60"] < 20: sigs.append("S13")
                 if L["b60"] > 80: sigs.append("S14")
-            deep = (L["b20"] < 10) or (L["b60"] is not None and L["b60"] < 10)
-            state = ("深度超卖" if deep else "超卖" if "S2" in sigs or "S13" in sigs
-                     else "超买" if "S7" in sigs or "S14" in sigs else "—")
-            if state in ("超卖", "深度超卖"):
+            buy_hits = [s for s in sigs if s in ("S1", "S2", "S12", "S13")]
+            if buy_hits:
                 oversold.append(nm)
-            if L["b20"] < 20 and (L["b60"] or 0) < 20:
-                resonant.append(nm)
-            table.append({"code": c, "name": nm, **L, "state": state, "sigs": sigs})
+                if ("S2" in sigs or "S13" in sigs) and \
+                   ((L["b60"] or 0) < 20) and L["b20"] < 20:
+                    resonant.append({"name": nm, "sigs": sigs})
+            badge = ("超卖" if buy_hits else
+                     ("偏多" if ("S7" in sigs or "S14" in sigs or L["b20"] > 50) else "偏空"))
+            bclass = ("green" if badge == "超卖" else "red" if badge == "偏多" else "yellow")
+            pos = ("60%~80%（S2 建仓/S3 确认加仓）" if buy_hits
+                   else "≤40%~60%（防御持有）")   # [作者规则]
+            cards.append({"code": c, "name": nm, **L, "badge": badge, "bclass": bclass,
+                          "sigs": sigs, "pos": pos})
 
-        # 选中口径：主图数据 + 事件标注 + 胜率摘要
-        s = rows[code_sel]
-        dates = [r["date"] for r in s]
-        b20 = [r["b20"] for r in s]
-        b60 = [r["b60"] for r in s]
-        close = [r["close"] for r in s]
-        idx = {d: i for i, d in enumerate(dates)}
-        ev = {
-            "S1": bt.edge_events(dates, b20, True, 10), "S2": bt.edge_events(dates, b20, True, 20),
-            "S7": bt.edge_events(dates, b20, False, 80), "S13": bt.edge_events(dates, b60, True, 20),
-            "S14": bt.edge_events(dates, b60, False, 80), "RES": bt.resonance_events(dates, b20, b60),
-            "THR": bt.thrust_events(dates, b20),
+        # 选中口径：区间切片 + 事件标注 + 胜率摘要
+        s = series_map[code_sel]
+        dates_all = [r["date"] for r in s]
+        b5_all = [r["b5"] for r in s]
+        b20_all = [r["b20"] for r in s]
+        b60_all = [r["b60"] for r in s]
+        close_all = [r["close"] for r in s]
+        ev_all = {
+            "S1": bt.edge_events(dates_all, b20_all, True, 10),
+            "S2": bt.edge_events(dates_all, b20_all, True, 20),
+            "S7": bt.edge_events(dates_all, b20_all, False, 80),
+            "S13": bt.edge_events(dates_all, b60_all, True, 20),
+            "S14": bt.edge_events(dates_all, b60_all, False, 80),
+            "RES": bt.resonance_events(dates_all, b20_all, b60_all),
         }
+        if rng == "1y" and len(dates_all) > 245:
+            lo = 1 if dates_all[-245] <= latest[code_sel]["date"] else 0
+            cut = len(dates_all) - 245
+        else:
+            cut = 0
+        dates = dates_all[cut:]
+        b5, b20, b60, close = b5_all[cut:], b20_all[cut:], b60_all[cut:], close_all[cut:]
+        idx = {d: i for i, d in enumerate(dates_all)}
         buy_marks, warn_marks = [], []
         for sid in ("S1", "S2", "S13", "RES"):
-            buy_marks += [{"date": d, "sid": sid, "close": close[idx[d]]} for d in ev[sid] if close[idx[d]]]
+            buy_marks += [{"date": d, "sid": sid, "close": close_all[idx[d]]}
+                          for d in ev_all[sid] if idx[d] >= cut and close_all[idx[d]]]
         for sid in ("S7", "S14"):
-            warn_marks += [{"date": d, "sid": sid, "close": close[idx[d]]} for d in ev[sid] if close[idx[d]]]
-        # 胜率摘要（选中口径，S2/S13/RES × 20/60 交易日）
+            warn_marks += [{"date": d, "sid": sid, "close": close_all[idx[d]]}
+                           for d in ev_all[sid] if idx[d] >= cut and close_all[idx[d]]]
         summary = {}
         for sid in ("S2", "S13", "RES"):
-            st = bt.fwd_stats(dates, close, ev[sid], [20, 60])
+            st = bt.fwd_stats(dates_all, close_all, ev_all[sid], [20, 60])
             summary[sid] = {"n": st["n_events"], "h20": st["holds"][20], "h60": st["holds"][60],
                             "base20": st["baseline"][20]}
         # 近期事件表（全口径混合，近 40 条）
         recent = []
         for c, nm in bt.CODE_NAME.items():
-            rc = rows[c]
-            dd = [r["date"] for r in rc]
-            c20 = [r["b20"] for r in rc]
-            c60 = [r["b60"] for r in rc]
-            for sid, ds in (("S1", bt.edge_events(dd, c20, True, 10)),
-                            ("S2", bt.edge_events(dd, c20, True, 20)),
-                            ("S7", bt.edge_events(dd, c20, False, 80)),
-                            ("S13", bt.edge_events(dd, c60, True, 20)),
-                            ("S14", bt.edge_events(dd, c60, False, 80)),
-                            ("RES", bt.resonance_events(dd, c20, c60))):
-                recent += [{"date": d, "code": nm, "sid": sid} for d in ds]
+            sig = bt.all_signals(conn, c)
+            for sid, evs in sig.items():
+                if sid in ("S10", "S11", "THR"):
+                    continue
+                recent += [{"date": e["date"], "code": nm, "sid": sid} for e in evs]
         recent.sort(key=lambda x: x["date"], reverse=True)
         recent = recent[:40]
     finally:
         conn.close()
 
     return render_template("breadth.html", code=code_sel, code_name=bt.CODE_NAME[code_sel],
-                           latest=latest, table=table, status=status, pct=pct,
-                           oversold=oversold, resonant=resonant, all_b20=a_now,
-                           all_date=latest["all"]["date"],
-                           dates=dates, b20=b20, b60=b60, close=close,
+                           rng=rng, cards=cards, status=status,
+                           oversold=oversold, resonant=resonant,
+                           all_b20=a_now, all_date=latest["all"]["date"],
+                           dates=dates, b5=b5, b20=b20, b60=b60, close=close,
+                           last_date=dates[-1] if dates else None,
                            buy_marks=buy_marks, warn_marks=warn_marks,
-                           summary=summary, recent=recent,
-                           sig_desc=bt.SIG_DESC)
+                           summary=summary, recent=recent, sig_desc=bt.SIG_DESC)
 
 
 if __name__ == "__main__":

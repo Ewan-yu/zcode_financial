@@ -1,63 +1,107 @@
 {% extends "base.html" %}
 {% block title %}市场广度 · 复盘工作台{% endblock %}
 {% block content %}
-<header class="page"><h1>市场广度信号看板</h1><span class="date">复刻：复利人生《市场广度》 · 事件口径=滞回（跌破触发/收复50重武装） · 对账 2026-10-18 核心锚 5/5</span></header>
+<header class="page"><h1>市场广度信号看板</h1>
+  <span class="badge {{ 'down' if status=='偏弱' else ('up' if status=='偏强' else '') }}" style="font-size:14px">市场状态：{{ status }}</span>
+  <span class="date">复刻：复利人生《市场广度》 · 事件口径=滞回 · 对账核心锚 5/5（2026-10-18）</span>
+</header>
 
 <!-- 头部状态卡（作者版式） -->
-<div class="chart span12" style="padding:18px 22px">
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
-    <div>
-      <div style="font-size:13px;color:var(--muted)">全A MA20 广度（{{ all_date }}）</div>
-      <div style="font-size:40px;font-weight:800;line-height:1.1;color:#1f2937">{{ all_b20 if all_b20 is not none else '—' }}<span style="font-size:18px">%</span></div>
-      <div style="font-size:14px;margin-top:4px;font-weight:600">{{ status }}<span style="font-weight:400;color:var(--muted);font-size:12px">（历史分位 {{ pct }}%，我方暂定规则）</span></div>
-    </div>
-    <div style="display:flex;gap:28px;text-align:right">
-      <div><div style="font-size:20px;font-weight:700;color:#0e9f6e">{{ oversold|length }} 个</div><div style="font-size:12px;color:var(--muted)">超卖区指数</div><div style="font-size:12.5px;color:#0e9f6e">{{ oversold|join('、') or '—' }}</div></div>
-      <div><div style="font-size:20px;font-weight:700;color:#dc2626">{{ resonant|length }} 个</div><div style="font-size:12px;color:var(--muted)">买入共振（MA20&amp;MA60 双&lt;20）</div><div style="font-size:12.5px;color:#dc2626">{{ resonant|join('、') or '—' }}</div></div>
-    </div>
+<div class="chart span12" style="padding:16px 22px">
+  <div style="font-size:14.5px;margin-bottom:10px">
+    全A广度 <b>{{ all_b20 if all_b20 is not none else '—' }}%</b>（{{ all_date }}，乐咕滞后 15 个交易日），
+    市场状态：<b>{{ status }}</b>；超卖区：{{ oversold|join('、') or '—' }}
   </div>
-  <!-- 信号图例 -->
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px">
-    {% for sid, desc in sig_desc.items() %}
-      <span style="font-size:11.5px;border:1px solid #e3e7ee;border-radius:14px;padding:2px 10px;color:#64748b;background:#fff">
-        <b style="color:#2563eb">{{ sid }}</b> {{ desc }}</span>
+  {% for r in resonant %}
+  <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:10px 16px;margin-bottom:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <span style="color:#059669;font-size:16px">★ 买入共振 <b>{{ r.name }}</b></span>
+    {% for s in r.sigs %}<span style="background:#d1fae5;color:#059669;border-radius:8px;padding:2px 10px;font-size:12.5px;font-weight:600">{{ s }} {{ '超卖' if s=='S2' else ('中期超卖' if s=='S13' else ('中期深度超卖' if s=='S12' else '深度超卖')) }}</span>{% endfor %}
+    <span style="color:#6b7280;font-size:12.5px">{{ r.sigs|length }} 个买入信号同时成立（广度日口径）</span>
+  </div>
+  {% else %}
+  <div style="background:#f9fafb;border:1px solid #e3e7ee;border-radius:10px;padding:10px 16px;margin-bottom:8px;color:#9ca3af;font-size:13px">当前无买入共振（任一口径 MA20&amp;MA60 广度同日双&lt;20 时点亮）</div>
+  {% endfor %}
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+    {% for sid, cls in [('S1','b'),('S2','b'),('S7','y'),('S12','b'),('S13','b'),('S14','y'),('S10','r'),('S11','b'),('RES','b'),('THR','g')] %}
+    <span style="font-size:11.5px;border-radius:8px;padding:3px 10px;font-weight:600;
+      {{ 'background:#d1fae5;color:#059669' if cls=='b' else ('background:#fef3c7;color:#b45309' if cls=='y' else ('background:#fee2e2;color:#dc2626' if cls=='r' else 'background:#f3f4f6;color:#6b7280')) }}">{{ sig_desc[sid] }}</span>
     {% endfor %}
   </div>
-  <p style="font-size:12.5px;color:#9ca3af;margin:10px 0 0">⚠ 广度值来自乐咕（免费档滞后 15 个交易日），「当前状态」口径=最新广度日；问财新鲜尾部补采后自动更新。S10/S11 背离=暂定口径（作者自标），不进胜率摘要。</p>
+  <p style="font-size:12px;color:#9ca3af;margin:8px 0 0">S10/S11 背离=暂定口径（作者自标）；THR 推力与状态阈值为我方发明参数；仓位建议=作者卡片规则复刻，不构成投资建议。</p>
 </div>
 
-<!-- 口径切换 + 主图 -->
+<!-- 八口径卡片（作者版式：大字+渐变条+MA5/60+触发+仓位建议） -->
+<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+  {% for r in cards %}
+  <div class="card" style="padding:14px 16px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <a href="{{ url_for('breadth', code=r.code) }}" style="font-size:15px;font-weight:700;color:var(--text)">{{ r.name }}</a>
+      <span style="font-size:12px;border-radius:8px;padding:2px 10px;font-weight:600;
+        {{ 'background:#d1fae5;color:#059669' if r.bclass=='green' else ('background:#fef3c7;color:#b45309' if r.bclass=='yellow' else ('background:#fee2e2;color:#dc2626' if r.bclass=='red' else 'background:#f3f4f6;color:#9ca3af')) }}">{{ r.badge }}</span>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:8px;margin:6px 0 8px">
+      <span style="font-size:30px;font-weight:800;color:#1f2937">{{ '%.1f'|format(r.b20) if r.b20 is not none else '—' }}<span style="font-size:14px">%</span></span>
+      <span style="font-size:12px;color:var(--muted)">MA20广度 · 收盘 {{ '%.2f'|format(r.close) if r.close else '—' }}</span>
+    </div>
+    <div style="position:relative;height:10px;border-radius:6px;margin:2px 0 4px;
+      background:linear-gradient(90deg,#a7f3d0 0%,#f3f4f6 25%,#f3f4f6 75%,#fecaca 100%)">
+      {% if r.b20 is not none %}<div style="position:absolute;left:{{ [r.b20, 100]|min }}%;top:-3px;width:3px;height:16px;background:#2563eb;border-radius:2px"></div>{% endif %}
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#9ca3af">
+      <span>0</span><span>10</span><span>20</span><span>50</span><span>80</span><span>100</span>
+    </div>
+    <div style="font-size:12.5px;margin:6px 0">MA5 <b>{{ '%.1f'|format(r.b5) if r.b5 is not none else '—' }}%</b>　MA60 <b>{{ '%.1f'|format(r.b60) if r.b60 is not none else '—' }}%</b>
+      <span style="color:#9ca3af;font-size:11px">（{{ r.date or '—' }}）</span></div>
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin:4px 0 8px;min-height:22px">
+      {% if r.sigs %}{% for s in r.sigs %}
+        <span style="font-size:11.5px;border-radius:7px;padding:2px 8px;font-weight:600;{{ 'background:#d1fae5;color:#059669' if s in ('S1','S2','S12','S13') else 'background:#fef3c7;color:#b45309' }}">{{ s }}</span>
+      {% endfor %}{% else %}<span style="font-size:11.5px;color:#9ca3af;border:1px solid #e3e7ee;border-radius:7px;padding:2px 8px">无触发</span>{% endif %}
+    </div>
+    <div style="font-size:12.5px;color:#374151;border-top:1px dashed #e3e7ee;padding-top:6px">仓位建议：{{ r.pos }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- 口径/区间切换 + 三段堆叠子图（作者版式） -->
 <div class="chart span12">
   <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 4px 8px;flex-wrap:wrap;gap:8px">
-    <div id="codePills" style="display:flex;gap:6px;flex-wrap:wrap">
-      {% for c, nm in [('all','全A'),('sz50','上证50'),('hs300','沪深300'),('zz500','中证500'),('csi1000','中证1000'),('gz2000','国证2000'),('cyb','创业板指'),('kc50','科创50')] %}
-      <a href="{{ url_for('breadth', code=c) }}" class="pill{{ ' active' if c==code }}" style="text-decoration:none">{{ nm }}</a>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      {% for c, nm in [('all','全A'),('sz50','上证50'),('hs300','沪深300'),('zz500','中证500'),('csi1000','中证1000'),('gz2000','中证2000*'),('cyb','创业板指'),('kc50','科创50')] %}
+      <a href="{{ url_for('breadth', code=c, rng=rng) }}" class="pill{{ ' active' if c==code }}" style="text-decoration:none">{{ nm }}</a>
       {% endfor %}
     </div>
-    <div style="font-size:12px;color:var(--muted)">
-      <span style="color:#dc2626">━</span> 指数（左轴）　<span style="color:#2563eb">━</span> MA20广度　<span style="color:#9ca3af">━</span> MA60广度（右轴0-100）　▲买类事件 ▼警戒事件
+    <div style="display:flex;gap:6px;align-items:center">
+      <a href="{{ url_for('breadth', code=code, rng='1y') }}" class="pill{{ ' active' if rng=='1y' }}" style="text-decoration:none">近一年</a>
+      <a href="{{ url_for('breadth', code=code, rng='all') }}" class="pill{{ ' active' if rng=='all' }}" style="text-decoration:none">全部</a>
+      <span style="font-size:12px;color:var(--muted);margin-left:6px">灰线=收盘点位（右轴）</span>
     </div>
   </div>
-  <div class="ec" id="cMain" style="height:400px"></div>
-  <div style="font-size:12px;color:var(--muted);padding:2px 4px">当前口径：<b>{{ code_name }}</b>；虚线=80/50/20 阈值；事件标注=滞回口径（{{ code_name }} 共 买类 {{ buy_marks|length }} / 警戒 {{ warn_marks|length }} 次，2022-08 起）。科创50 成分仅 50 只，参考价值有限。</div>
+  <div class="ec" id="cMain" style="height:760px"></div>
+  <div style="font-size:12px;color:var(--muted);padding:2px 4px">
+    「{{ code_name }}」收盘点位 × 广度：蓝线=广度（左轴 0-100），灰线=收盘（右轴）；红带&gt;80 超买区 / 绿带&lt;20 超卖区；
+    ▲买类事件 ▼警戒事件（滞回口径，MA20 面板）。*中证2000 以国证2000 近似（乐咕口径）。
+  </div>
+  <div style="font-size:12px;color:#9ca3af;padding:0 4px">
+    数据截至 <b>{{ last_date or '—' }}</b>（各口径广度日不一，卡片以其最新广度日为准） · 数据源：乐咕乐股（滞后 15 交易日）+ workbench.db · 问财新鲜尾部待补
+  </div>
 </div>
 
 <!-- 胜率摘要 + 近期事件 -->
 <div class="grid">
   <div class="chart span5">
-    <h3>{{ code_name }} 关键信号前瞻收益（触发日收盘入场）</h3>
+    <h3>{{ code_name }} 关键信号前瞻收益（触发日收盘入场，2022-08 起全窗口）</h3>
     <table style="width:100%;font-size:12.5px">
       <thead><tr><th>信号</th><th>n</th><th>20日 胜率/均值</th><th>60日 胜率/均值</th></tr></thead>
       <tbody>
       {% for sid, s in summary.items() %}
         <tr><td><b>{{ sid }}</b> {{ '超卖' if sid=='S2' else ('中期超卖' if sid=='S13' else '共振') }}</td>
           <td>{{ s.n }}</td>
-          <td class="{{ 'up' if s.h20.win and s.h20.win > 55 else '' }}">{{ s.h20.win }}% / {{ s.h20.mean }}%</td>
-          <td class="{{ 'up' if s.h60.win and s.h60.win > 55 else '' }}">{{ s.h60.win }}% / {{ s.h60.mean }}%</td></tr>
+          <td class="{{ 'up' if s.h20.win and s.h20.win > 55 else '' }}">{{ (s.h20.win ~ '%') if s.h20.win is not none else '—' }} / {{ (s.h20.mean ~ '%') if s.h20.mean is not none else '—' }}</td>
+          <td class="{{ 'up' if s.h60.win and s.h60.win > 55 else '' }}">{{ (s.h60.win ~ '%') if s.h60.win is not none else '—' }} / {{ (s.h60.mean ~ '%') if s.h60.mean is not none else '—' }}</td></tr>
       {% endfor %}
       </tbody>
     </table>
-    <div style="font-size:11.5px;color:var(--muted);padding-top:6px">任意日基准（20日）：胜率 {{ summary.S2.base20.win }}% / 均值 {{ summary.S2.base20.mean }}%。样本 2022-08 起（滞回口径）；n 小于 10 只作方向参考。</div>
+    <div style="font-size:11.5px;color:var(--muted);padding-top:6px">任意日基准（20日）：胜率 {{ summary.S2.base20.win }}% / 均值 {{ summary.S2.base20.mean }}%。滞回口径；n&lt;10 只作方向参考。对照作者：超卖反弹在 大中盘有效、小盘/科创失效（XC-J-003）。</div>
   </div>
   <div class="chart span7">
     <h3>全口径近期事件（滞回，近 40 条）</h3>
@@ -68,7 +112,7 @@
       {% for r in recent %}
         <tr><td>{{ r.date }}</td><td>{{ r.code }}</td>
           <td><b style="color:#2563eb">{{ r.sid }}</b></td>
-          <td style="color:var(--muted)">{{ sig_desc[r.sid].split('→')[-1].strip() if '→' in sig_desc[r.sid] else sig_desc[r.sid] }}</td></tr>
+          <td style="color:var(--muted)">{{ sig_desc[r.sid] }}</td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -76,20 +120,10 @@
   </div>
 </div>
 
-<!-- 各口径状态表 -->
-<div class="tbl"><h3>八口径当前状态（广度日口径，滞后≤15日）</h3>
-<table><thead><tr><th>口径</th><th>广度日</th><th>MA20广度</th><th>MA60广度</th><th>状态</th><th>命中信号</th></tr></thead><tbody>
-{% for r in table %}
-<tr><td><a href="{{ url_for('breadth', code=r.code) }}">{{ r.name }}</a></td><td>{{ r.date or '—' }}</td>
-  <td>{{ r.b20 if r.b20 is not none else '—' }}</td><td>{{ r.b60 if r.b60 is not none else '—' }}</td>
-  <td class="{{ 'down' if r.state in ('超卖','深度超卖') else ('warn' if r.state=='超买' else '') }}">{{ r.state }}</td>
-  <td>{% for s in r.sigs %}<span class="badge" style="font-size:11px;margin-right:4px">{{ s }}</span>{% endfor %}</td></tr>
-{% endfor %}
-</tbody></table></div>
-
 <div style="font-size:12px;color:var(--muted);padding:8px 4px">
-  口径与对账：乐咕 8 指数广度（399303=国证2000≈作者中证2000；all≈全A）；验证式回测核心锚 5/5 PASS（沪深300 超卖 n=12/均值+2.13% vs 基准+0.46%；超买 8 指数全正；国证2000 超卖跑输基准；sz50/zz500/csi1000 事件数 13/13/14 与作者一致；创业板 RES 60日胜率 71.4%——持有越久胜率越高）。
-  方法论条目：XC-J-003 / XC-R-005。判断引用触发关键带时按 AGENTS.md 第 6 条登记台账。
+  口径与对账：验证式回测核心锚 5/5 PASS（沪深300 超卖 n=12/均值+2.13% vs 基准+0.46%；8 指数超买全正；国证2000 超卖跑输基准；
+  sz50/zz500/csi1000 事件数 13/13/14 与作者一致；创业板 RES 60 日胜率 71.4%）。
+  方法论条目：XC-J-003 / XC-R-005。信号触发按 AGENTS.md 第 6 条登记台账。
 </div>
 
 <style>
@@ -98,41 +132,74 @@
 </style>
 
 <script>
-const DATES = {{ dates | tojson }}, B20 = {{ b20 | tojson }}, B60 = {{ b60 | tojson }}, CLOSE = {{ close | tojson }};
-const BUY = {{ buy_marks | tojson }}, WARN = {{ warn_marks | tojson }};
-const tip = {trigger:'axis',backgroundColor:'#fff',borderColor:'#e5e7eb',textStyle:{color:'#374151',fontSize:12},
-  axisPointer:{type:'cross',crossStyle:{color:'#999'}}};
-const chartEl = document.getElementById('cMain');
-if (typeof echarts !== 'undefined' && DATES.length) {
-  const ch = echarts.init(chartEl);
+/* 命名空间 BD：避免与 board.js 全局常量（WARN/TEXT/LINE 等）冲突 */
+const BD = {
+  dates: {{ dates | tojson }}, b5: {{ b5 | tojson }}, b20: {{ b20 | tojson }},
+  b60: {{ b60 | tojson }}, close: {{ close | tojson }},
+  buy: {{ buy_marks | tojson }}, warn: {{ warn_marks | tojson }}
+};
+(function () {
+  if (typeof echarts === "undefined" || !BD.dates.length) return;
+  const ch = echarts.init(document.getElementById("cMain"));
+  const axisTxt = { color: "#6b7280", fontSize: 10.5 };
+  const axisLine = { lineStyle: { color: "#e5e7eb" } };
+  const mkBands = [{ yAxis: 80, itemStyle: { color: "rgba(220,38,38,.05)" } },
+                   { yAxis: [0, 20], itemStyle: { color: "rgba(14,159,110,.06)" } }];
+  function breadthSeries(name, data, gi, showMarks) {
+    return { name: name, type: "line", data: data, xAxisIndex: gi, yAxisIndex: gi * 2,
+      symbol: "none", connectNulls: true, sampling: "lttb",
+      lineStyle: { color: "#2563eb", width: 1.7 },
+      endLabel: { show: true, formatter: p => (p.value == null ? "" : p.value.toFixed ? p.value.toFixed(1) : p.value) + "%",
+                  color: "#2563eb", fontSize: 11 },
+      markArea: { silent: true, data: [[{ yAxis: 80, itemStyle: { color: "rgba(220,38,38,.05)" } }, { yAxis: 100 }],
+                                       [{ yAxis: 0, itemStyle: { color: "rgba(14,159,110,.06)" } }, { yAxis: 20 }]] },
+      markLine: { silent: true, symbol: "none", lineStyle: { color: "#d1d5db", type: "dashed" },
+        label: { show: gi === 0, fontSize: 10, color: "#9ca3af" },
+        data: [{ yAxis: 80, label: { formatter: "80" } }, { yAxis: 50, label: { formatter: "50" } },
+               { yAxis: 20, label: { formatter: "20" } }] } };
+  }
+  function closeSeries(gi, showAxis) {
+    return { name: "收盘", type: "line", data: BD.close, xAxisIndex: gi, yAxisIndex: gi * 2 + 1,
+      symbol: "none", sampling: "lttb", lineStyle: { color: "#9ca3af", width: 1.1 },
+      endLabel: { show: true, formatter: p => (p.value == null ? "" : Math.round(p.value).toLocaleString()),
+                  color: "#9ca3af", fontSize: 10.5 } };
+  }
+  const grids = [], xAxes = [], yAxes = [], series = [];
+  const names = [["收盘点位 × MA20 广度", BD.b20], ["收盘点位 × MA5 广度", BD.b5], ["收盘点位 × MA60 广度", BD.b60]];
+  names.forEach((n, gi) => {
+    const top = 26 + gi * 240;
+    grids.push({ left: 52, right: 62, top: top, height: 196 });
+    xAxes.push({ type: "category", gridIndex: gi, data: BD.dates,
+      axisLabel: { ...axisTxt, show: gi === 2, hideOverlap: true, formatter: v => v.slice(2) },
+      axisLine: axisLine, splitLine: { show: false } });
+    yAxes.push({ type: "value", gridIndex: gi, min: 0, max: 100, interval: 30,
+      axisLabel: { ...axisTxt, formatter: v => v }, splitLine: { show: false }, axisLine: { show: false } });
+    yAxes.push({ type: "value", gridIndex: gi, scale: true, splitLine: { show: false },
+      axisLabel: { ...axisTxt, formatter: v => Math.round(v).toLocaleString(), show: true }, axisLine: { show: false } });
+    series.push(closeSeries(gi));
+    series.push(breadthSeries(n[0], n[1], gi));
+  });
+  // 事件标注（MA20 面板，落在收盘右轴上）
+  series.push({ name: "买类事件", type: "scatter", xAxisIndex: 0, yAxisIndex: 1, symbol: "triangle",
+    symbolSize: 9, itemStyle: { color: "#dc2626" },
+    data: BD.buy.map(m => ({ value: [m.date, m.close], sid: m.sid })),
+    tooltip: { formatter: p => p.data.sid + " 买类事件<br>" + p.value[0] + " @" + p.value[1] } });
+  series.push({ name: "警戒事件", type: "scatter", xAxisIndex: 0, yAxisIndex: 1,
+    symbol: "path://M0,0L8,0L4,7Z", symbolSize: 9, itemStyle: { color: "#d97706" },
+    data: BD.warn.map(m => ({ value: [m.date, m.close], sid: m.sid })),
+    tooltip: { formatter: p => p.data.sid + " 警戒事件<br>" + p.value[0] + " @" + p.value[1] } });
+  // 面板标题
+  const titles = names.map((n, gi) => ({
+    text: n[0], left: 56, top: top_(gi), textStyle: { color: "#374151", fontSize: 12.5, fontWeight: 600 } }));
+  function top_(gi) { return 4 + gi * 240; }
   ch.setOption({
-    backgroundColor:'transparent', tooltip:tip, legend:{show:false},
-    grid:{left:60,right:56,top:24,bottom:30},
-    xAxis:{type:'category',data:DATES,axisLabel:{color:'#6b7280',fontSize:11,hideOverlap:true},
-      axisLine:{lineStyle:{color:'#e5e7eb'}},splitLine:{show:false}},
-    yAxis:[
-      {type:'value',scale:true,axisLabel:{color:'#6b7280',fontSize:11},splitLine:{lineStyle:{color:'#f3f4f6'}}},
-      {type:'value',min:0,max:100,axisLabel:{color:'#6b7280',fontSize:11,formatter:'{value}%'},splitLine:{show:false}}],
-    series:[
-      {name:'指数收盘',type:'line',data:CLOSE,yAxisIndex:0,symbol:'none',lineStyle:{color:'#dc2626',width:1.5}},
-      {name:'MA20广度',type:'line',data:B20,yAxisIndex:1,symbol:'none',connectNulls:true,sampling:'lttb',
-       lineStyle:{color:'#2563eb',width:1.7},
-       markLine:{silent:true,symbol:'none',lineStyle:{color:'#9ca3af',type:'dashed'},
-         data:[{yAxis:80,label:{formatter:'80 超买',color:'#6b7280',fontSize:10,position:'insideEndTop'}},
-               {yAxis:50,label:{formatter:'50 多空线',color:'#6b7280',fontSize:10,position:'insideEndTop'}},
-               {yAxis:20,label:{formatter:'20 超卖',color:'#6b7280',fontSize:10,position:'insideEndBottom'}}]}},
-      {name:'MA60广度',type:'line',data:B60,yAxisIndex:1,symbol:'none',connectNulls:true,sampling:'lttb',
-       lineStyle:{color:'#9ca3af',width:1.4}},
-      {name:'买类事件',type:'scatter',yAxisIndex:0,symbol:'triangle',symbolSize:9,
-       data:BUY.map(m=>({value:[m.date,m.close],sid:m.sid})),
-       itemStyle:{color:'#dc2626'},
-       tooltip:{formatter:p=>p.data.sid+' 买类事件<br>'+p.value[0]+' @'+p.value[1]}},
-      {name:'警戒事件',type:'scatter',yAxisIndex:0,symbol:'path://M0,0L8,0L4,7Z',symbolSize:9,
-       data:WARN.map(m=>({value:[m.date,m.close],sid:m.sid})),
-       itemStyle:{color:'#d97706'},
-       tooltip:{formatter:p=>p.data.sid+' 警戒事件<br>'+p.value[0]+' @'+p.value[1]}}
-    ]});
-  window.addEventListener('resize',()=>ch.resize());
-}
+    backgroundColor: "transparent",
+    tooltip: { trigger: "axis", backgroundColor: "#fff", borderColor: "#e5e7eb",
+      textStyle: { color: "#374151", fontSize: 12 }, axisPointer: { type: "cross", crossStyle: { color: "#999" } } },
+    axisPointer: { link: [{ xAxisIndex: "all" }] },
+    title: titles, legend: { show: false }, grid: grids, xAxis: xAxes, yAxis: yAxes, series: series
+  });
+  window.addEventListener("resize", () => ch.resize());
+})();
 </script>
 {% endblock %}
