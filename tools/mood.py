@@ -28,8 +28,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 PRESETS = [
-    ("net_break_pb", "破净股占比", "情绪/顶底", "%", "问财三段截面+sector_data家数",
-     "0<PB<1 家数 / 全A家数（净资产为正自动排除资不抵债；含ST；剔除退市整理股；分母=板块001005010成分数）",
+    ("net_break_pb", "破净股占比", "情绪/顶底", "%", "问财三段截面(沪深A股)+sector_data家数",
+     "0<PB<1 家数 / 沪深A家数（不含北交所，对齐复利人生作者口径≈5226；净资产为正自动排除资不抵债；含ST；剔除退市整理股；分母=沪深A股家数）",
      1),  # direction=+1：越高越悲观（底部信号）
     ("market_pb", "全市场市净率", "估值", "倍", "万得EDB M0071672",
      "沪深两市整体市净率（中证指数公司口径，2011-05-03 起）——长期估值背景线；2026-10-18 实测 wind-economic EDB 取数受限（超限），待权限恢复后回补", 0),
@@ -194,7 +194,10 @@ def cmd_import_wencai(a):
         if code in seen:
             continue
         seen.add(code)
-        if "退" in (name or ""):  # 退市整理期股票剔除（口径：含ST、含北交所）
+        if code.endswith(".BJ"):  # 北交所剔除（口径对齐作者：沪深A股）
+            dropped.append("%s %s" % (code, name))
+            continue
+        if "退" in (name or ""):  # 退市整理期股票剔除（含ST）
             dropped.append("%s %s" % (code, name))
             continue
         uniq.append((code, name, pb))
@@ -205,6 +208,7 @@ def cmd_import_wencai(a):
     conn = connect()
     meta = {"snapshots": files, "dropped_delisting": dropped,
             "denom": a.denom, "denom_source": "sector_data 001005010",
+            "caliber": "沪深A股（.BJ 代码强制剔除，双保险）",
             "collected_at": datetime.date.today().isoformat()}
     with conn:
         conn.execute("INSERT OR REPLACE INTO mood_obs VALUES (?,?,?,?,?,?,?)",
