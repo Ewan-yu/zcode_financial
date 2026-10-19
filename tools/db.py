@@ -387,6 +387,11 @@ def cmd_pool(a):
                 conn.execute("INSERT INTO pool_events (date,pool,code,name,event,reason,extra,created_at)"
                              " VALUES (?,?,?,?,?,?,?,?)",
                              (d, a.pool, code, name, "add", a.reason, jdump({"horizon": a.horizon}), today()))
+                if a.pool == "youzi":
+                    # 双写约定（2026-10-19）：youzi 池新增即建当日 picks 档案，
+                    # /youzi 页与实证校准流才有数据；IGNORE 防止覆盖已富化行
+                    conn.execute("INSERT OR IGNORE INTO youzi_picks (date,code,name,note) VALUES (?,?,?,?)",
+                                 (d, code, name, a.reason))
             _out("pool add %s: %d 只" % (a.pool, len(parse_codes(a.codes))))
         elif a.action == "remove":
             for code, name in parse_codes(a.codes):

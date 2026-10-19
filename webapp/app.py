@@ -24,10 +24,16 @@ _CACHE = {"epoch": None, "store": {}}
 
 
 def _cache_epoch():
+    # 主库 mtime 作基准（db.py 写完 checkpoint 会删掉 -wal 文件，旧写法 max() 遇缺
+    # 整体抛 OSError → epoch 恒为 None、缓存永不失效——2026-10-19 修复）
     try:
-        return max(os.path.getmtime(DB), os.path.getmtime(str(DB) + "-wal"))
+        mt = os.path.getmtime(DB)
     except OSError:
         return None
+    try:
+        return max(mt, os.path.getmtime(str(DB) + "-wal"))
+    except OSError:
+        return mt
 
 
 def cache_get(key):
@@ -405,7 +411,8 @@ def youzi():
     pp = ROOT / "data" / "youzi_profile.json"
     if pp.exists():
         profile = json.loads(pp.read_text(encoding="utf-8"))
-    return render_template("youzi.html", recs=recs, stats=stats, profile=profile)
+    pool = q("SELECT code,name,note,added FROM pool_members WHERE pool='youzi' AND status='active' ORDER BY added")
+    return render_template("youzi.html", recs=recs, stats=stats, profile=profile, pool=pool)
 
 
 # ---------------- 页面：市场情绪指标（复刻复利人生看板版式） ----------------

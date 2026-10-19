@@ -32,6 +32,13 @@
 {% endif %}
 {% else %}<div class="note warn">风格画像档案（data/youzi_profile.json）不存在——本机未创建或未同步，仅显示记录数据。</div>{% endif %}
 
+{% if pool %}
+<div class="sec"><h2>在池跟踪 <span class="sub">youzi 股池 active 成员（含实盘对账基准）——入选记录表只含已建 picks 档案的标的</span></h2>
+<div class="tbl">
+<table><thead><tr><th>加入日</th><th>标的</th><th>状态</th><th>备注（双锚/成本/实盘对账）</th></tr></thead><tbody>
+{% for p in pool %}<tr><td>{{ p.added }}</td><td><a href="{{ url_for('stock', code=p.code) }}">{{ p.name or p.code }}</a></td><td><span class="badge up">在池</span></td><td>{{ p.note or '' }}</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endif %}
 <div class="sec"><h2>入选记录 <span class="sub">点击行展开入选日特征与前向收益全文</span></h2>
 <div class="tbl">
 <table>
