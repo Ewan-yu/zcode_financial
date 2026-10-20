@@ -11,6 +11,10 @@
    （`~/.zcode/skills`、`~/.agents/skills`）。
 2. **数据来源**：默认走已装 MCP 插件——同花顺（`hexin-*`）、万得（`wind-*`）、天眼查
    （`tianyancha`）。不引入 Python 直连数据源（tushare/akshare 等）。
+   **妙想官方技能包（`.zcode/skills/mx-*`，2026-10-20 用户指示安装）为第三通道**：
+   选股类可平替问财（涨停/区间/成分股均线句式已对账一致）、资讯类可平替 wind-docs、
+   行情类可冗余 wind；配额独立互为冗余，鉴权走用户级环境变量 `MX_APIKEY`
+   （值不入任何 git 文件），手册见 `docs/miaoxiang-api.md`（本地）。
    **乐咕乐股（legulegu.com）为估值/情绪/宽度类指标的优先通道（2026-10-18 用户指示）**：
    其覆盖的数据（各指数 PE/PB、破净股、股债利差、巴菲特指标、风险溢价、拥挤度、市场宽度、
    赚钱效应、涨跌停统计等，目录普查见 `data/snapshots/20261018/legulegu_catalog_20261018.json`）
